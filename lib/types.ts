@@ -41,3 +41,12 @@ export interface MarketDataResponse {
   };
   sentiment: SentimentData;
 }
+
+/** AI 生成的每日市场分析（由 Claude 生成，存储在 Vercel KV） */
+export interface AIAnalysis {
+  macroAnalysis: string;      // 宏观判断
+  cryptoAnalysis: string;     // 加密分析
+  actionSuggestions: string;  // 操作建议
+  generatedAt: string;        // 生成时间（ISO 格式）
+  dataTimestamp: string;      // 基于的市场数据时间戳
+}

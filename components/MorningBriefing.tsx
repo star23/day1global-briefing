@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { MarketDataResponse, StockData, CryptoData } from "@/lib/types";
+import { MarketDataResponse, StockData, CryptoData, AIAnalysis } from "@/lib/types";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -99,13 +99,23 @@ function Skeleton({ width, height }: { width?: string; height?: string }) {
 export default function MorningBriefing() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // SWR 自动获取数据，每5分钟刷新
+  // SWR 自动获取市场数据，每5分钟刷新
   const { data, error, isLoading } = useSWR<MarketDataResponse>(
     "/api/market-data",
     fetcher,
     {
       refreshInterval: 5 * 60 * 1000,  // 5分钟自动刷新
       revalidateOnFocus: true,          // 切换回页面时刷新
+    }
+  );
+
+  // SWR 获取 AI 生成的分析内容（每天更新一次，30分钟刷新检查）
+  const { data: analysis } = useSWR<AIAnalysis>(
+    "/api/analysis",
+    fetcher,
+    {
+      refreshInterval: 30 * 60 * 1000,  // 30分钟检查一次
+      revalidateOnFocus: false,          // 不频繁刷新（每天只更新一次）
     }
   );
 
@@ -186,9 +196,9 @@ export default function MorningBriefing() {
             {activeTab === "overview" && <OverviewTab data={data} />}
             {activeTab === "stocks" && <StocksTab data={data} />}
             {activeTab === "crypto" && <CryptoTab data={data} />}
-            {activeTab === "sentiment" && <SentimentTab data={data} />}
-            {activeTab === "liquidity" && <LiquidityTab />}
-            {activeTab === "btc-analysis" && <BTCAnalysisTab data={data} />}
+            {activeTab === "sentiment" && <SentimentTab data={data} analysis={analysis} />}
+            {activeTab === "liquidity" && <LiquidityTab analysis={analysis} />}
+            {activeTab === "btc-analysis" && <BTCAnalysisTab data={data} analysis={analysis} />}
           </>
         )}
       </main>
@@ -558,7 +568,7 @@ function CryptoTab({ data }: { data?: MarketDataResponse }) {
 }
 
 // ========== 市场情绪标签页 ==========
-function SentimentTab({ data }: { data?: MarketDataResponse }) {
+function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* VIX */}
@@ -634,39 +644,74 @@ function SentimentTab({ data }: { data?: MarketDataResponse }) {
           <p style={{ color: "#94a3b8" }}>恐慌贪婪指数加载中...</p>
         )}
       </Card>
+
+      {/* AI 操作建议（如果有 AI 分析数据） */}
+      {analysis?.actionSuggestions && (
+        <Card title="AI 操作建议">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Badge text="AI 生成" color="#8b5cf6" />
+            {analysis.generatedAt && (
+              <span style={{ fontSize: 11, color: "#64748b" }}>
+                {formatTimestamp(analysis.generatedAt)}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+            {analysis.actionSuggestions}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
 
-// ========== 流动性标签页（半静态内容） ==========
-function LiquidityTab() {
+// ========== 流动性标签页 ==========
+function LiquidityTab({ analysis }: { analysis?: AIAnalysis | null }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Card title="全球流动性观察">
-        <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8 }}>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>美联储资产负债表：</strong>
-            关注缩表/扩表节奏，QT（量化紧缩）速度放缓对风险资产有利。
-          </p>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>逆回购（RRP）：</strong>
-            RRP 余额下降意味着流动性重新流入市场，利好股票和加密资产。
-          </p>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>美债收益率：</strong>
-            10Y 国债收益率是资金成本的风向标。收益率下行对成长股和 BTC 有利。
-          </p>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>美元指数（DXY）：</strong>
-            美元走弱通常利好大宗商品和新兴市场资产。
-          </p>
-          <div style={{ marginTop: 16, padding: 12, background: "#0a0e17", borderRadius: 8, border: "1px solid #1e293b" }}>
-            <p style={{ fontSize: 12, color: "#64748b" }}>
-              此部分内容为半静态分析，每日手动更新或后续接入 AI 自动生成。
-            </p>
+      {/* AI 宏观判断（如果有） */}
+      {analysis?.macroAnalysis ? (
+        <Card title="AI 宏观判断">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Badge text="AI 生成" color="#8b5cf6" />
+            {analysis.generatedAt && (
+              <span style={{ fontSize: 11, color: "#64748b" }}>
+                {formatTimestamp(analysis.generatedAt)}
+              </span>
+            )}
           </div>
-        </div>
-      </Card>
+          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+            {analysis.macroAnalysis}
+          </div>
+        </Card>
+      ) : (
+        /* 回退内容：没有 AI 分析时显示静态内容 */
+        <Card title="全球流动性观察">
+          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8 }}>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>美联储资产负债表：</strong>
+              关注缩表/扩表节奏，QT（量化紧缩）速度放缓对风险资产有利。
+            </p>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>逆回购（RRP）：</strong>
+              RRP 余额下降意味着流动性重新流入市场，利好股票和加密资产。
+            </p>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>美债收益率：</strong>
+              10Y 国债收益率是资金成本的风向标。收益率下行对成长股和 BTC 有利。
+            </p>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>美元指数（DXY）：</strong>
+              美元走弱通常利好大宗商品和新兴市场资产。
+            </p>
+            <div style={{ marginTop: 16, padding: 12, background: "#0a0e17", borderRadius: 8, border: "1px solid #1e293b" }}>
+              <p style={{ fontSize: 12, color: "#64748b" }}>
+                AI 分析尚未生成。等待每日定时任务运行后，此处将显示 AI 宏观判断。
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card title="关键宏观日程">
         <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8 }}>
@@ -689,7 +734,7 @@ function LiquidityTab() {
 }
 
 // ========== BTC 分析标签页 ==========
-function BTCAnalysisTab({ data }: { data?: MarketDataResponse }) {
+function BTCAnalysisTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
   const btc = data?.crypto?.BTC;
 
   return (
@@ -710,32 +755,48 @@ function BTCAnalysisTab({ data }: { data?: MarketDataResponse }) {
         )}
       </Card>
 
-      {/* BTC 底部分析 */}
-      <Card title="BTC 周期分析">
-        <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8 }}>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>减半周期：</strong>
-            BTC 第四次减半已于 2024 年 4 月完成。历史上减半后 12-18 个月通常进入牛市主升浪。
-          </p>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>链上指标：</strong>
-            关注 MVRV 比率、NUPL（未实现利润/损失）和 SOPR 等指标判断市场阶段。
-          </p>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>ETF 资金流：</strong>
-            BTC 现货 ETF 的净流入/流出是重要的短期风向标。持续净流入支撑价格。
-          </p>
-          <p style={{ marginBottom: 12 }}>
-            <strong style={{ color: "#f1f5f9" }}>关键价位：</strong>
-            支撑位和阻力位根据实际行情动态更新。
-          </p>
-          <div style={{ marginTop: 16, padding: 12, background: "#0a0e17", borderRadius: 8, border: "1px solid #1e293b" }}>
-            <p style={{ fontSize: 12, color: "#64748b" }}>
-              深度分析内容将后续接入 AI 自动生成，结合链上数据和技术指标。
-            </p>
+      {/* AI 加密分析 或 回退静态内容 */}
+      {analysis?.cryptoAnalysis ? (
+        <Card title="AI 加密市场分析">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Badge text="AI 生成" color="#8b5cf6" />
+            {analysis.generatedAt && (
+              <span style={{ fontSize: 11, color: "#64748b" }}>
+                {formatTimestamp(analysis.generatedAt)}
+              </span>
+            )}
           </div>
-        </div>
-      </Card>
+          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+            {analysis.cryptoAnalysis}
+          </div>
+        </Card>
+      ) : (
+        <Card title="BTC 周期分析">
+          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.8 }}>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>减半周期：</strong>
+              BTC 第四次减半已于 2024 年 4 月完成。历史上减半后 12-18 个月通常进入牛市主升浪。
+            </p>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>链上指标：</strong>
+              关注 MVRV 比率、NUPL（未实现利润/损失）和 SOPR 等指标判断市场阶段。
+            </p>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>ETF 资金流：</strong>
+              BTC 现货 ETF 的净流入/流出是重要的短期风向标。持续净流入支撑价格。
+            </p>
+            <p style={{ marginBottom: 12 }}>
+              <strong style={{ color: "#f1f5f9" }}>关键价位：</strong>
+              支撑位和阻力位根据实际行情动态更新。
+            </p>
+            <div style={{ marginTop: 16, padding: 12, background: "#0a0e17", borderRadius: 8, border: "1px solid #1e293b" }}>
+              <p style={{ fontSize: 12, color: "#64748b" }}>
+                AI 分析尚未生成。等待每日定时任务运行后，此处将显示 AI 加密市场分析。
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* 仓位建议 */}
       <Card title="仓位管理提示">
