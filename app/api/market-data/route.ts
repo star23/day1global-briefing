@@ -1,0 +1,73 @@
+// ========== 市场数据 API ==========
+// 聚合所有数据源，返回完整的市场数据
+// 包含 10 秒内存缓存，防止频繁请求被限流
+
+import { NextResponse } from "next/server";
+import { fetchAllStocks, fetchIndices } from "@/lib/fetch-stocks";
+import { fetchAllCrypto } from "@/lib/fetch-crypto";
+import { fetchFearGreedIndex } from "@/lib/fetch-fear-greed";
+import { MarketDataResponse } from "@/lib/types";
+
+// 强制动态渲染（不在构建时预渲染）
+export const dynamic = "force-dynamic";
+
+// ---- 内存缓存 ----
+// 缓存最近一次成功获取的数据，10秒内不重复请求
+let cachedData: MarketDataResponse | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 10 * 1000; // 10 秒缓存
+
+export async function GET() {
+  // 检查缓存是否有效（10秒内）
+  const now = Date.now();
+  if (cachedData && now - cacheTimestamp < CACHE_TTL) {
+    return NextResponse.json(cachedData, {
+      headers: {
+        "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+      },
+    });
+  }
+
+  // 并发请求所有数据源（某个失败不影响其他）
+  const [stocks, crypto, indices, sentiment] = await Promise.all([
+    fetchAllStocks().catch((err) => {
+      console.error("获取股票数据失败:", err);
+      return {};
+    }),
+    fetchAllCrypto().catch((err) => {
+      console.error("获取加密货币数据失败:", err);
+      return {};
+    }),
+    fetchIndices().catch((err) => {
+      console.error("获取指数数据失败:", err);
+      return { vix: null, gold: null };
+    }),
+    fetchFearGreedIndex().catch((err) => {
+      console.error("获取恐慌贪婪指数失败:", err);
+      return { cryptoFearGreed: 50, cryptoFearGreedLabel: "Neutral" };
+    }),
+  ]);
+
+  // 组装返回数据
+  const responseData: MarketDataResponse = {
+    timestamp: new Date().toISOString(),
+    stocks,
+    crypto,
+    indices: {
+      vix: indices.vix ?? { price: 0, changePercent: 0 },
+      gold: indices.gold ?? { price: 0, changePercent: 0 },
+    },
+    sentiment,
+  };
+
+  // 更新缓存
+  cachedData = responseData;
+  cacheTimestamp = now;
+
+  return NextResponse.json(responseData, {
+    headers: {
+      // CDN 缓存60秒，过期后可使用旧数据5分钟
+      "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+    },
+  });
+}

@@ -1,0 +1,31 @@
+{
+  "name": "day1global-briefing",
+  "version": "1.0.0",
+  "description": "Daily Market Briefing for U.S Stocks and Crypto",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:33442/git/star23/day1global-briefing"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "geist": "^1.7.0",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "swr": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.2.14",
+    "typescript": "^5.9.3"
+  }
+}
