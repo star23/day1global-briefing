@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
 
   try {
     // ---- 第一步：获取最新市场数据 ----
-    const baseUrl = process.env.VERCEL_URL
+    const baseUrl = process.env.BASE_URL || (process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+      : "http://localhost:3000");
 
     const res = await fetch(`${baseUrl}/api/market-data`);
     const data: MarketDataResponse = await res.json();
