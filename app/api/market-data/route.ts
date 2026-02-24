@@ -14,10 +14,10 @@ import { MarketDataResponse } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 // ---- 内存缓存 ----
-// 缓存最近一次成功获取的数据，10秒内不重复请求
+// 缓存最近一次成功获取的数据，60秒内不重复请求外部API
 let cachedData: MarketDataResponse | null = null;
 let cacheTimestamp = 0;
-const CACHE_TTL = 10 * 1000; // 10 秒缓存
+const CACHE_TTL = 60 * 1000; // 60 秒内存缓存（防止外部 API 限流）
 
 export async function GET() {
   // 检查缓存是否有效（10秒内）
@@ -25,7 +25,8 @@ export async function GET() {
   if (cachedData && now - cacheTimestamp < CACHE_TTL) {
     return NextResponse.json(cachedData, {
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate",
+        // CDN 缓存 30 秒，过期后可用旧数据 60 秒（同时后台刷新）
+        "Cache-Control": "s-maxage=30, stale-while-revalidate=60",
       },
     });
   }
@@ -82,7 +83,8 @@ export async function GET() {
   return NextResponse.json(responseData, {
     headers: {
       // 不使用 CDN 缓存，靠内存缓存(10s)和前端 SWR(5min) 控制频率
-      "Cache-Control": "no-store, no-cache, must-revalidate",
+      // CDN 缓存 30 秒，过期后可用旧数据 60 秒（同时后台刷新）
+        "Cache-Control": "s-maxage=30, stale-while-revalidate=60",
     },
   });
 }
