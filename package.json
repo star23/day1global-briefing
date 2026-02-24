@@ -18,7 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
-    "@vercel/kv": "^3.0.0",
+    "@upstash/redis": "^1.36.2",
     "geist": "^1.7.0",
     "next": "^14.2.35",
     "react": "^18.3.1",

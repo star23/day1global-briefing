@@ -2,12 +2,17 @@
 // Vercel Cron Job 每天定时调用此接口
 // 1. 获取最新市场数据
 // 2. 调用 Claude AI 生成中文市场分析
-// 3. 将分析结果存入 Vercel KV 供前端读取
+// 3. 将分析结果存入 Upstash Redis 供前端读取
 
 import { NextRequest, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
 import { generateMarketAnalysis } from "@/lib/generate-analysis";
 import { MarketDataResponse } from "@/lib/types";
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
 
 export async function GET(request: NextRequest) {
   // 验证 CRON_SECRET，防止被随意调用
@@ -39,9 +44,9 @@ export async function GET(request: NextRequest) {
         console.log("[Cron] 正在调用 Claude AI 生成市场分析...");
         const analysis = await generateMarketAnalysis(data);
 
-        // ---- 第三步：存入 Vercel KV ----
+        // ---- 第三步：存入 Upstash Redis ----
         // 设置 24 小时过期（秒为单位），防止过期数据一直留着
-        await kv.set("ai-analysis", analysis, { ex: 86400 });
+        await redis.set("ai-analysis", analysis, { ex: 86400 });
 
         console.log(`[Cron] AI 分析已生成并存储: ${analysis.generatedAt}`);
         analysisGenerated = true;
