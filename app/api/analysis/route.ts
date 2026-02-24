@@ -1,18 +1,23 @@
 // ========== AI 分析读取接口 ==========
-// 从 Vercel KV 读取 AI 生成的市场分析内容
+// 从 Upstash Redis 读取 AI 生成的市场分析内容
 // 前端通过此接口获取最新的 AI 分析
 
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
 import { AIAnalysis } from "@/lib/types";
 
 // 强制动态渲染
 export const dynamic = "force-dynamic";
 
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
+
 export async function GET() {
   try {
-    // 从 Vercel KV 读取最新的 AI 分析
-    const analysis = await kv.get<AIAnalysis>("ai-analysis");
+    // 从 Upstash Redis 读取最新的 AI 分析
+    const analysis = await redis.get<AIAnalysis>("ai-analysis");
 
     if (!analysis) {
       // 如果没有数据（比如还没跑过 cron），返回 null
