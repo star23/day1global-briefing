@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@upstash/redis": "^1.36.2",
+    "@vercel/analytics": "^1.6.1",
     "geist": "^1.7.0",
     "next": "^14.2.35",
     "react": "^18.3.1",
