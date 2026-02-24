@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { generateMarketAnalysis } from "@/lib/generate-analysis";
+import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
 
 const redis = new Redis({
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
 
     // ---- 第二步：调用 Claude AI 生成分析 ----
     let analysisGenerated = false;
+    let telegramPushed = false;
 
     // 只有配置了 API Key 才尝试生成 AI 分析
     if (process.env.ANTHROPIC_API_KEY) {
@@ -50,6 +52,16 @@ export async function GET(request: NextRequest) {
 
         console.log(`[Cron] AI 分析已生成并存储: ${analysis.generatedAt}`);
         analysisGenerated = true;
+
+        // ---- 第四步：推送到 Telegram ----
+        try {
+          telegramPushed = await pushTelegramBriefing(data, analysis);
+          if (telegramPushed) {
+            console.log("[Cron] Telegram 推送成功");
+          }
+        } catch (tgErr) {
+          console.error("[Cron] Telegram 推送失败:", tgErr);
+        }
       } catch (aiErr) {
         // AI 生成失败不影响整体流程，市场数据更新仍然成功
         console.error("[Cron] AI 分析生成失败:", aiErr);
@@ -63,6 +75,7 @@ export async function GET(request: NextRequest) {
       timestamp: data.timestamp,
       message: "数据已更新",
       aiAnalysis: analysisGenerated ? "已生成" : "未生成（缺少 API Key 或生成失败）",
+      telegram: telegramPushed ? "已推送" : "未推送",
     });
   } catch (err) {
     console.error("[Cron] 数据更新失败:", err);
