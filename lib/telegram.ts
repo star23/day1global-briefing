@@ -152,6 +152,7 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
 
   // ---- 尾部 ----
   lines.push("");
+  lines.push(`📊 完整数据请访问 <a href="https://brief.day1global.xyz/">brief.day1global.xyz</a>`);
   lines.push(`🔗 <a href="https://day1global.xyz/">Day1Global</a> | <a href="https://x.com/starzq">X</a> | <a href="https://t.me/day1global">Telegram</a> | <a href="https://www.youtube.com/@Day1Global">YouTube</a>`);
 
   return lines.join("\n");
