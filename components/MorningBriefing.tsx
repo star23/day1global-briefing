@@ -4,7 +4,7 @@
 
 import { useState, ReactNode } from "react";
 import useSWR from "swr";
-import { MarketDataResponse, StockData, AIAnalysis } from "@/lib/types";
+import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis } from "@/lib/types";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -332,12 +332,33 @@ export default function MorningBriefing() {
                 fontSize: 22,
                 fontWeight: 800,
                 margin: 0,
-                background: "linear-gradient(90deg, #60a5fa, #a78bfa)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
               }}
             >
-              📡 每日情报早报
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #60a5fa, #a78bfa)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                📡 每日美股&加密市场早报
+              </span>
+              <a
+                href="https://x.com/starzq"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 400,
+                  color: COLORS.muted,
+                  textDecoration: "none",
+                }}
+              >
+                by starzq
+              </a>
             </h1>
             <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 4 }}>
               {dateStr}
@@ -665,11 +686,21 @@ function LiquidityTab({ analysis }: { analysis?: AIAnalysis | null }) {
 // ========== 市场情绪标签页 ==========
 function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
+  const cnnFG = data?.sentiment?.cnnFearGreed;
+  const cnnLabel = data?.sentiment?.cnnFearGreedLabel;
   const vixPrice = data?.indices?.vix?.price ?? 20;
   const vixChange = data?.indices?.vix?.changePercent ?? 0;
 
+  // CNN Fear & Greed 评级逻辑
+  const cnnBadge = cnnFG !== null && cnnFG !== undefined
+    ? (cnnFG <= 25 ? "🔴 极端恐惧" : cnnFG <= 45 ? "⚠️ 恐惧" : cnnFG <= 55 ? "✅ 中性" : cnnFG <= 75 ? "✅ 贪婪" : "🔴 极端贪婪")
+    : "📊 获取中";
+  const cnnColor = cnnFG !== null && cnnFG !== undefined
+    ? (cnnFG <= 25 ? COLORS.red : cnnFG <= 45 ? COLORS.yellow : cnnFG <= 55 ? COLORS.green : cnnFG <= 75 ? COLORS.green : COLORS.red)
+    : COLORS.muted;
+
   const sentimentIndicators = [
-    { name: "CNN恐惧贪婪指数", val: "参考外部数据", signal: "需手动查看CNN数据", badge: "📊 待确认", color: COLORS.muted },
+    { name: "CNN恐惧贪婪指数", val: cnnFG !== null && cnnFG !== undefined ? `${cnnFG}/100` : "获取中...", signal: cnnLabel ? `${cnnLabel}` : "美股市场情绪指标", badge: cnnBadge, color: cnnColor },
     { name: "VIX恐慌指数", val: formatPrice(vixPrice), signal: vixPrice > 30 ? "恐慌区间" : vixPrice > 20 ? "偏高但未恐慌" : "正常区间", badge: vixPrice > 30 ? "🔴 恐慌" : vixPrice > 20 ? "⚠️ 关注" : "✅ 正常", color: vixPrice > 30 ? COLORS.red : vixPrice > 20 ? COLORS.yellow : COLORS.green },
     { name: "加密恐惧贪婪", val: `${fearGreed}/100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : fearGreed <= 45 ? "恐惧" : "中性偏上", badge: fearGreed <= 25 ? "🔴 极端" : fearGreed <= 45 ? "⚠️ 恐惧" : "✅ 正常", color: fearGreed <= 25 ? COLORS.red : fearGreed <= 45 ? COLORS.yellow : COLORS.green },
     { name: "S&P 500远期PE", val: "~22-23x", signal: "接近历史高位区间", badge: "⚠️ 关注", color: COLORS.yellow },
@@ -704,8 +735,12 @@ function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14 }}>
             <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 6 }}>美股情绪</div>
+            {cnnFG !== null && cnnFG !== undefined && (
+              <Gauge value={cnnFG} max={100} label={`CNN Fear & Greed (${cnnFG})`} color={cnnColor} />
+            )}
             <Gauge value={vixPrice} max={50} label={`VIX (当前 ${formatPrice(vixPrice)})`} color={vixPrice > 30 ? COLORS.red : vixPrice > 20 ? COLORS.yellow : COLORS.green} />
             <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 6 }}>
+              {cnnFG !== null && cnnFG !== undefined ? `CNN指数=${cnnFG} (${cnnLabel})。` : ""}
               VIX {formatChange(vixChange)}。{vixPrice > 25 ? "波动性偏高，注意控制仓位。" : "波动性正常范围。关注关键财报与宏观数据。"}
             </div>
           </div>
@@ -760,14 +795,70 @@ function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?
 function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
   const btc = data?.crypto?.BTC;
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
+  const metrics = data?.btcMetrics;
+
+  // 周线 RSI
+  const rsi = metrics?.weeklyRsi;
+  const rsiVal = rsi !== null && rsi !== undefined ? `${rsi}` : "计算中...";
+  const rsiSignal = rsi !== null && rsi !== undefined
+    ? (rsi < 30 ? "RSI<30 已进入超跌区域！" : rsi < 40 ? "RSI偏低，接近超跌" : "RSI在正常范围")
+    : "等待数据";
+  const rsiBadge = rsi !== null && rsi !== undefined
+    ? (rsi < 30 ? "✅ 触发" : rsi < 40 ? "🟡 接近" : "⚪ 正常")
+    : "⚪ 待确认";
+  const rsiColor = rsi !== null && rsi !== undefined
+    ? (rsi < 30 ? COLORS.green : rsi < 40 ? COLORS.yellow : COLORS.muted)
+    : COLORS.muted;
+
+  // 成交量变化
+  const volChange = metrics?.volumeChangePercent;
+  const vol24h = metrics?.volume24h;
+  const volVal = vol24h !== null && vol24h !== undefined
+    ? `$${(vol24h / 1e9).toFixed(1)}B (${volChange !== null && volChange !== undefined ? `${volChange > 0 ? "+" : ""}${volChange.toFixed(0)}%` : "N/A"} vs 30d均值)`
+    : "获取中...";
+  const volSignal = volChange !== null && volChange !== undefined
+    ? (volChange < -50 ? "成交量极度萎缩=卖盘枯竭" : volChange < -20 ? "成交量萎缩，接近底部特征" : "成交量正常")
+    : "等待数据";
+  const volBadge = volChange !== null && volChange !== undefined
+    ? (volChange < -50 ? "✅ 触发" : volChange < -20 ? "🟡 接近" : "⚪ 正常")
+    : "⚪ 待确认";
+  const volColor = volChange !== null && volChange !== undefined
+    ? (volChange < -50 ? COLORS.green : volChange < -20 ? COLORS.yellow : COLORS.muted)
+    : COLORS.muted;
+
+  // MVRV
+  const mvrv = metrics?.mvrv;
+  const mvrvVal = mvrv !== null && mvrv !== undefined ? `${mvrv.toFixed(2)}` : "需链上数据源";
+  const mvrvSignal = mvrv !== null && mvrv !== undefined
+    ? (mvrv < 1.0 ? "MVRV<1.0 持有者整体亏损！" : mvrv < 1.5 ? "偏低但未跌破1.0" : "正常范围")
+    : "需接入 Glassnode/CryptoQuant";
+  const mvrvBadge = mvrv !== null && mvrv !== undefined
+    ? (mvrv < 1.0 ? "✅ 触发" : mvrv < 1.5 ? "🟡 接近" : "⚪ 正常")
+    : "⚪ 待接入";
+  const mvrvColor = mvrv !== null && mvrv !== undefined
+    ? (mvrv < 1.0 ? COLORS.green : mvrv < 1.5 ? COLORS.yellow : COLORS.muted)
+    : COLORS.muted;
+
+  // LTH
+  const lth = metrics?.lthSupplyPercent;
+  const lthVal = lth !== null && lth !== undefined ? `${lth.toFixed(1)}%` : "需链上数据源";
+  const lthSignal = lth !== null && lth !== undefined
+    ? (lth > 70 ? "LTH持仓高——信心强" : "LTH持仓正常")
+    : "需接入 Glassnode/CryptoQuant";
+  const lthBadge = lth !== null && lth !== undefined
+    ? (lth > 70 ? "✅ 触发" : "🟡 关注")
+    : "⚪ 待接入";
+  const lthColor = lth !== null && lth !== undefined
+    ? (lth > 70 ? COLORS.green : COLORS.yellow)
+    : COLORS.muted;
 
   const btcIndicators = [
-    { name: "周线RSI", val: "关注链上数据", signal: "RSI跌破30为超跌信号", badge: fearGreed <= 15 ? "🟡 接近" : "⚪ 待确认", color: fearGreed <= 15 ? COLORS.yellow : COLORS.muted },
-    { name: "成交量变化", val: "关注交易所数据", signal: "恐慌抛售后缩量=卖盘枯竭", badge: "🟡 关注", color: COLORS.yellow },
-    { name: "MVRV比率", val: "关注链上数据", signal: "跌破1.0=持有者整体亏损", badge: "🟡 关注", color: COLORS.yellow },
+    { name: "周线RSI", val: rsiVal, signal: rsiSignal, badge: rsiBadge, color: rsiColor },
+    { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor },
+    { name: "MVRV比率", val: mvrvVal, signal: mvrvSignal, badge: mvrvBadge, color: mvrvColor },
     { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted },
     { name: "矿机关机价", val: "~$55-60K参考", signal: "接近中效矿机成本线时关注", badge: "📊 参考", color: COLORS.muted },
-    { name: "LTH长期持有者", val: "关注链上数据", signal: "LTH增持=底部特征之一", badge: "🟡 关注", color: COLORS.yellow },
+    { name: "LTH长期持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor },
   ];
 
   const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发")).length;

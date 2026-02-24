@@ -22,8 +22,19 @@ export interface IndexData {
 
 /** 市场情绪数据 */
 export interface SentimentData {
-  cryptoFearGreed: number;        // 恐慌贪婪指数 0-100
-  cryptoFearGreedLabel: string;   // 文字标签（如 "Greed", "Fear"）
+  cryptoFearGreed: number;           // 加密恐慌贪婪指数 0-100
+  cryptoFearGreedLabel: string;      // 文字标签（如 "Greed", "Fear"）
+  cnnFearGreed: number | null;       // CNN 恐惧贪婪指数 0-100（美股情绪）
+  cnnFearGreedLabel: string | null;  // CNN 文字标签
+}
+
+/** BTC 技术/链上指标 */
+export interface BTCMetrics {
+  weeklyRsi: number | null;           // 14 周期周线 RSI
+  volume24h: number | null;           // 24小时成交量 (USD)
+  volumeChangePercent: number | null; // 成交量 vs 30日均量 变化百分比
+  mvrv: number | null;                // MVRV 比率
+  lthSupplyPercent: number | null;    // 长期持有者供应占比
 }
 
 /** /api/market-data 返回的完整数据格式 */
@@ -40,6 +51,7 @@ export interface MarketDataResponse {
     gold: IndexData;
   };
   sentiment: SentimentData;
+  btcMetrics: BTCMetrics;  // BTC 技术指标
 }
 
 /** AI 生成的每日市场分析（由 Claude 生成，存储在 Vercel KV） */

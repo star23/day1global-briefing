@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { fetchAllStocks, fetchIndices } from "@/lib/fetch-stocks";
 import { fetchAllCrypto } from "@/lib/fetch-crypto";
 import { fetchFearGreedIndex } from "@/lib/fetch-fear-greed";
+import { fetchCNNFearGreed } from "@/lib/fetch-cnn-fear-greed";
+import { fetchBTCMetrics } from "@/lib/fetch-btc-metrics";
 import { MarketDataResponse } from "@/lib/types";
 
 // 强制动态渲染（不在构建时预渲染）
@@ -23,13 +25,13 @@ export async function GET() {
   if (cachedData && now - cacheTimestamp < CACHE_TTL) {
     return NextResponse.json(cachedData, {
       headers: {
-        "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
   }
 
   // 并发请求所有数据源（某个失败不影响其他）
-  const [stocks, crypto, indices, sentiment] = await Promise.all([
+  const [stocks, crypto, indices, sentiment, cnnFearGreed, btcMetrics] = await Promise.all([
     fetchAllStocks().catch((err) => {
       console.error("获取股票数据失败:", err);
       return {};
@@ -44,7 +46,15 @@ export async function GET() {
     }),
     fetchFearGreedIndex().catch((err) => {
       console.error("获取恐慌贪婪指数失败:", err);
-      return { cryptoFearGreed: 50, cryptoFearGreedLabel: "Neutral" };
+      return { cryptoFearGreed: 50, cryptoFearGreedLabel: "Neutral", cnnFearGreed: null, cnnFearGreedLabel: null };
+    }),
+    fetchCNNFearGreed().catch((err) => {
+      console.error("获取 CNN Fear & Greed 失败:", err);
+      return null;
+    }),
+    fetchBTCMetrics().catch((err) => {
+      console.error("获取 BTC metrics 失败:", err);
+      return { weeklyRsi: null, volume24h: null, volumeChangePercent: null, mvrv: null, lthSupplyPercent: null };
     }),
   ]);
 
@@ -57,7 +67,12 @@ export async function GET() {
       vix: indices.vix ?? { price: 0, changePercent: 0 },
       gold: indices.gold ?? { price: 0, changePercent: 0 },
     },
-    sentiment,
+    sentiment: {
+      ...sentiment,
+      cnnFearGreed: cnnFearGreed?.score ?? null,
+      cnnFearGreedLabel: cnnFearGreed?.label ?? null,
+    },
+    btcMetrics,
   };
 
   // 更新缓存
@@ -66,8 +81,8 @@ export async function GET() {
 
   return NextResponse.json(responseData, {
     headers: {
-      // CDN 缓存60秒，过期后可使用旧数据5分钟
-      "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+      // 不使用 CDN 缓存，靠内存缓存(10s)和前端 SWR(5min) 控制频率
+      "Cache-Control": "no-store, no-cache, must-revalidate",
     },
   });
 }

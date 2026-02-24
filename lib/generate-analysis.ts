@@ -35,7 +35,7 @@ ${cryptoLines || "  暂无数据"}
   黄金 (GC=F): $${data.indices.gold.price.toFixed(2)} (${data.indices.gold.changePercent >= 0 ? "+" : ""}${data.indices.gold.changePercent.toFixed(2)}%)
 
 【市场情绪】
-  加密恐慌贪婪指数: ${data.sentiment.cryptoFearGreed}/100 (${data.sentiment.cryptoFearGreedLabel})
+  加密恐慌贪婪指数: ${data.sentiment.cryptoFearGreed}/100 (${data.sentiment.cryptoFearGreedLabel})${data.sentiment.cnnFearGreed !== null ? `\n  CNN恐惧贪婪指数(美股): ${data.sentiment.cnnFearGreed}/100 (${data.sentiment.cnnFearGreedLabel})` : ""}${data.btcMetrics?.weeklyRsi !== null ? `\n\n【BTC技术指标】\n  周线RSI: ${data.btcMetrics.weeklyRsi}` : ""}${data.btcMetrics?.volume24h !== null ? `\n  24h成交量: $${(data.btcMetrics.volume24h! / 1e9).toFixed(1)}B (${data.btcMetrics.volumeChangePercent !== null ? `${data.btcMetrics.volumeChangePercent > 0 ? "+" : ""}${data.btcMetrics.volumeChangePercent.toFixed(0)}% vs 30日均值` : "N/A"})` : ""}
 `.trim();
 }
 
