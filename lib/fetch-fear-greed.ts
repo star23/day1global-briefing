@@ -9,6 +9,8 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
   const defaultData: SentimentData = {
     cryptoFearGreed: 50,
     cryptoFearGreedLabel: "Neutral",
+    cnnFearGreed: null,
+    cnnFearGreedLabel: null,
   };
 
   try {
@@ -30,6 +32,8 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
     return {
       cryptoFearGreed: parseInt(fngData.value, 10),
       cryptoFearGreedLabel: fngData.value_classification ?? "Unknown",
+      cnnFearGreed: null,
+      cnnFearGreedLabel: null,
     };
   } catch (err) {
     console.error("获取恐慌贪婪指数出错:", err);
