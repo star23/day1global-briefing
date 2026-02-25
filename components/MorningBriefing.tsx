@@ -428,7 +428,7 @@ export default function MorningBriefing() {
 
       {/* Footer */}
       <footer style={{ textAlign: "center", padding: "24px 16px", color: "#64748b", fontSize: 12 }}>
-        <a href="https://day1global.xyz/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Day1 Global</a> Briefing — 数据来源: Finnhub, OKX, Alternative.me, Claude AI
+        <a href="https://day1global.xyz/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Day1 Global</a> Briefing — 数据来源: Finnhub, OKX, Alternative.me, CoinGlass, Claude AI
       </footer>
     </div>
   );
