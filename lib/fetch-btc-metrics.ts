@@ -54,7 +54,10 @@ function calculateRSI(closes: number[], period: number = 14): number | null {
   return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
 }
 
-/** 从 CoinGlass 获取单个端点的最新数据记录 */
+/**
+ * 从 CoinGlass 获取单个端点的最新数据记录
+ * CoinGlass V4 响应格式: { code: "0", data: [ { timestamp, price, ...fields } ] }
+ */
 async function fetchCoinGlassLatest(
   apiKey: string,
   endpoint: string,
@@ -69,21 +72,11 @@ async function fetchCoinGlassLatest(
       return null;
     }
     const json = await res.json();
-    // DEBUG: 输出完整响应结构
-    console.log(`[CoinGlass] ${label} 响应:`, JSON.stringify({
-      code: json.code,
-      msg: json.msg,
-      dataType: Array.isArray(json.data) ? "array" : typeof json.data,
-      dataLength: Array.isArray(json.data) ? json.data.length : undefined,
-      firstItem: Array.isArray(json.data) && json.data.length > 0 ? json.data[0] : undefined,
-      lastItem: Array.isArray(json.data) && json.data.length > 0 ? json.data[json.data.length - 1] : undefined,
-      rawDataPreview: !Array.isArray(json.data) ? json.data : undefined,
-    }));
     if (json.code !== "0" || !json.data) {
       console.error(`[CoinGlass] ${label} 数据异常:`, json.msg || "无数据");
       return null;
     }
-    // data 可能是数组或对象
+    // data 可能是数组（时间序列）或对象
     if (Array.isArray(json.data)) {
       if (json.data.length === 0) {
         console.error(`[CoinGlass] ${label} 数据为空数组`);
@@ -91,7 +84,6 @@ async function fetchCoinGlassLatest(
       }
       return json.data[json.data.length - 1];
     }
-    // 如果 data 直接就是对象
     if (typeof json.data === "object") {
       return json.data;
     }
@@ -102,7 +94,15 @@ async function fetchCoinGlassLatest(
   }
 }
 
-/** 从 CoinGlass 获取链上指标：STH-SOPR、LTH-SOPR、LTH Supply%、200WMA */
+/**
+ * 从 CoinGlass 获取链上指标：STH-SOPR、LTH-SOPR、LTH Supply%、200WMA
+ *
+ * API 响应字段对照:
+ *   bitcoin-sth-sopr          → { timestamp, price, sth_sopr }
+ *   bitcoin-lth-sopr          → { timestamp, price, lth_sopr }
+ *   bitcoin-long-term-holder-supply → { timestamp, price, long_term_holder_supply }
+ *   200-week-moving-average-heatmap → { timestamp, price, moving_average_1440, moving_average_1440_ip }
+ */
 async function fetchOnChainMetrics(apiKey: string): Promise<{
   sthSopr: number | null;
   lthSopr: number | null;
@@ -119,44 +119,32 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     ]);
 
   // --- STH-SOPR ---
+  // 字段: sth_sopr
   let sthSopr: number | null = null;
   if (sthSoprData) {
-    console.log("[CoinGlass] STH-SOPR 原始数据:", JSON.stringify(sthSoprData));
-    // 尝试多种可能的字段名
-    const v = Number(
-      sthSoprData.sopr ?? sthSoprData.value ?? sthSoprData.sth_sopr ??
-      sthSoprData.STH_SOPR ?? sthSoprData.ratio
-    );
+    const v = Number(sthSoprData.sth_sopr);
     if (!isNaN(v) && v > 0) {
       sthSopr = Math.round(v * 1000) / 1000;
       console.log(`[CoinGlass] STH-SOPR = ${sthSopr}`);
-    } else {
-      console.error(`[CoinGlass] STH-SOPR 无法解析值, v=${v}`);
     }
   }
 
   // --- LTH-SOPR ---
+  // 字段: lth_sopr
   let lthSopr: number | null = null;
   if (lthSoprData) {
-    console.log("[CoinGlass] LTH-SOPR 原始数据:", JSON.stringify(lthSoprData));
-    const v = Number(
-      lthSoprData.sopr ?? lthSoprData.value ?? lthSoprData.lth_sopr ??
-      lthSoprData.LTH_SOPR ?? lthSoprData.ratio
-    );
+    const v = Number(lthSoprData.lth_sopr);
     if (!isNaN(v) && v > 0) {
       lthSopr = Math.round(v * 1000) / 1000;
       console.log(`[CoinGlass] LTH-SOPR = ${lthSopr}`);
-    } else {
-      console.error(`[CoinGlass] LTH-SOPR 无法解析值, v=${v}`);
     }
   }
 
   // --- LTH Supply Percent ---
+  // 字段: long_term_holder_supply
   let lthSupplyPercent: number | null = null;
   if (lthSupplyData) {
-    const supply = Number(
-      lthSupplyData.long_term_holder_supply ?? lthSupplyData.supply
-    );
+    const supply = Number(lthSupplyData.long_term_holder_supply);
     if (!isNaN(supply) && supply > 0) {
       lthSupplyPercent =
         Math.round((supply / BTC_APPROX_CIRCULATING) * 1000) / 10;
@@ -167,18 +155,11 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   }
 
   // --- 200 WMA ---
+  // 字段: moving_average_1440 (200周均线), price (当前价格)
   let wma200Price: number | null = null;
   let wma200Multiplier: number | null = null;
   if (wma200Data) {
-    // 先 log 一下返回的字段，方便调试
-    console.log("[CoinGlass] 200WMA 原始数据字段:", Object.keys(wma200Data));
-    const wma = Number(
-      wma200Data.ma200 ??
-        wma200Data.moving_average ??
-        wma200Data.wma200 ??
-        wma200Data.ma ??
-        wma200Data.value
-    );
+    const wma = Number(wma200Data.moving_average_1440);
     const price = Number(wma200Data.price);
     if (!isNaN(wma) && wma > 0) {
       wma200Price = Math.round(wma);
