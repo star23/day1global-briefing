@@ -135,9 +135,9 @@ ${marketSummary}${newsSummary}
 /** 从 AI 响应中提取指定部分的内容 */
 function extractSection(text: string, sectionName: string): string {
   // 匹配 ===宏观判断=== 到下一个 === 或文末
+  // 不要加 "m" 标志！m 让 $ 匹配每行末尾，导致 lazy [\s\S]*? 只捕获第一行
   const regex = new RegExp(
-    `===${sectionName}===\\s*([\\s\\S]*?)(?====.+===|$)`,
-    "m"
+    `===${sectionName}===\\s*([\\s\\S]*?)(?====.+===|$)`
   );
   const match = text.match(regex);
   return match ? match[1].trim() : `${sectionName}分析暂未生成`;
