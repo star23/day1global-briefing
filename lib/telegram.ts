@@ -150,6 +150,21 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     }
   }
 
+  // ---- 今日必看新闻 ----
+  if (analysis.topNews && analysis.topNews.length > 0) {
+    lines.push("");
+    lines.push(`📰 <b>今日必看新闻</b>`);
+    // Telegram 消息字数有限，取前 5 条
+    const topItems = analysis.topNews.slice(0, 5);
+    topItems.forEach((n, i) => {
+      lines.push(`${i + 1}. [${n.tag}] <a href="${n.url}">${n.title}</a>`);
+      if (n.action) lines.push(`   👉 ${n.action}`);
+    });
+    if (analysis.topNews.length > 5) {
+      lines.push(`  ...更多新闻请访问网站`);
+    }
+  }
+
   // ---- 尾部 ----
   lines.push("");
   lines.push(`📊 完整数据请访问 <a href="https://brief.day1global.xyz/">brief.day1global.xyz</a>`);

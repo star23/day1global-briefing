@@ -4,7 +4,7 @@
 
 import { useState, ReactNode } from "react";
 import useSWR from "swr";
-import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis } from "@/lib/types";
+import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem } from "@/lib/types";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -428,7 +428,7 @@ export default function MorningBriefing() {
 
       {/* Footer */}
       <footer style={{ textAlign: "center", padding: "24px 16px", color: "#64748b", fontSize: 12 }}>
-        <a href="https://day1global.xyz/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Day1 Global</a> Briefing — 数据来源: Yahoo Finance, CoinGecko, Alternative.me, Claude AI
+        <a href="https://day1global.xyz/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Day1 Global</a> Briefing — 数据来源: Finnhub, OKX, Alternative.me, Claude AI
       </footer>
     </div>
   );
@@ -1070,22 +1070,23 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
 
 // ========== 新闻标签页 ==========
 function NewsTab({ analysis }: { analysis?: AIAnalysis | null }) {
-  // 静态新闻作为回退（当AI分析不可用时）
-  const defaultNews = [
-    { tag: "📊 宏观", title: "关注美联储政策动向与经济数据", detail: "FOMC会议纪要、CPI/PPI通胀数据、非农就业报告是影响市场的关键因素。", action: "密切跟踪宏观日历，重要数据公布前控制仓位。" },
-    { tag: "⚡ 财报", title: "关键持仓财报季", detail: "NVDA、CRCL、RKLB等核心持仓即将或已发布财报，关注业绩指引。", action: "财报前持有等结果。关注收入增长、利润率和forward guidance。" },
-    { tag: "🥇 避险", title: "黄金持续走强——避险需求支撑", detail: "央行持续购金，地缘风险与通胀预期支撑金价。XAUT锚定实物黄金。", action: "XAUT继续持有——当前环境下优秀的避险资产配置。" },
-    { tag: "₿ 加密", title: "加密市场波动加剧", detail: "BTC与ETH走势震荡，链上数据显示市场情绪分化。ETF资金流是短期风向标。", action: "关注链上指标与ETF净流入/流出数据，分批操作。" },
-    { tag: "🏛️ 政策", title: "关税与地缘政治不确定性", detail: "关税政策变化与国际局势持续影响市场风险偏好。", action: "保持防御配置（黄金+低Beta），关注政策进展。" },
-    { tag: "🐋 链上", title: "关注鲸鱼与机构行为", detail: "大户地址和机构（如ARK）的买卖行为是重要的市场信号。", action: "跟踪鲸鱼地址变化和ARK每日交易报告。" },
-    { tag: "🚀 航天", title: "商业航天板块关注RKLB", detail: "Neutron火箭开发进展是核心催化剂。SpaceX IPO预期提振整个板块。", action: "长期持有。关注Neutron时间表和订单簿增长。" },
-    { tag: "💹 DeFi", title: "DeFi与AI Agent叙事", detail: "Hyperliquid持续拓展产品线。AI Agent赛道波动较大但叙事空间大。", action: "HYPE关注关键支撑位。VIRTUAL等高Beta资产控制仓位。" },
-  ];
+  const newsItems: NewsItem[] = analysis?.topNews ?? [];
+  const hasNews = newsItems.length > 0;
+
+  function getTagColor(tag: string): string {
+    if (tag.includes("宏观")) return COLORS.accent;
+    if (tag.includes("加密")) return COLORS.orange;
+    if (tag.includes("财报")) return COLORS.yellow;
+    if (tag.includes("政策") || tag.includes("地缘")) return COLORS.red;
+    if (tag.includes("避险")) return COLORS.gold;
+    if (tag.includes("科技")) return COLORS.green;
+    return COLORS.purple;
+  }
 
   return (
-    <Card title="📰 今日必看 + 操作建议" icon="" accent={COLORS.purple}>
-      {/* AI 分析摘要 */}
-      {analysis && (
+    <Card title="📰 今日必看 10 条新闻" icon="" accent={COLORS.purple}>
+      {/* AI 操作建议摘要 */}
+      {analysis?.actionSuggestions && (
         <div style={{ marginBottom: 16, padding: 12, background: COLORS.dimBg, borderRadius: 8, border: `1px solid ${COLORS.purple}30` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Badge color={COLORS.purple}>AI 每日摘要</Badge>
@@ -1093,34 +1094,57 @@ function NewsTab({ analysis }: { analysis?: AIAnalysis | null }) {
               <span style={{ fontSize: 11, color: "#64748b" }}>{formatTimestamp(analysis.generatedAt)}</span>
             )}
           </div>
-          {analysis.actionSuggestions && (
-            <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
-              {analysis.actionSuggestions}
-            </div>
-          )}
+          <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+            {analysis.actionSuggestions}
+          </div>
         </div>
       )}
 
-      {defaultNews.map((n, i) => (
-        <div key={i} style={{ padding: "12px 0", borderBottom: i < defaultNews.length - 1 ? `1px solid ${COLORS.cardBorder}22` : "none" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <Badge
-              color={
-                n.tag.includes("紧急") ? COLORS.red :
-                n.tag.includes("财报") ? COLORS.accent :
-                n.tag.includes("避险") ? COLORS.gold :
-                n.tag.includes("加密") ? COLORS.orange :
-                COLORS.purple
-              }
-            >
-              {n.tag}
-            </Badge>
-            <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.text }}>{n.title}</span>
+      {hasNews ? (
+        newsItems.map((n, i) => (
+          <div
+            key={i}
+            style={{
+              padding: "12px 0",
+              borderBottom: i < newsItems.length - 1 ? `1px solid ${COLORS.cardBorder}22` : "none",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <Badge color={getTagColor(n.tag)}>{n.tag}</Badge>
+              <a
+                href={n.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: COLORS.text,
+                  textDecoration: "none",
+                  borderBottom: `1px dashed ${COLORS.muted}44`,
+                }}
+              >
+                {n.title}
+              </a>
+              <span style={{ fontSize: 10, color: "#64748b", marginLeft: "auto", whiteSpace: "nowrap" }}>
+                {n.source}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 4 }}>{n.summary}</div>
+            {n.action && (
+              <div style={{ fontSize: 12, color: COLORS.green, fontWeight: 600 }}>
+                👉 {n.action}
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 4 }}>{n.detail}</div>
-          <div style={{ fontSize: 12, color: COLORS.green, fontWeight: 600 }}>👉 {n.action}</div>
+        ))
+      ) : (
+        <div style={{ padding: 16, textAlign: "center", color: COLORS.muted, fontSize: 13 }}>
+          <div style={{ marginBottom: 8 }}>新闻数据尚未生成</div>
+          <div style={{ fontSize: 11, color: "#64748b" }}>
+            等待每日定时任务运行后，此处将显示 AI 精选的今日必看新闻。
+          </div>
         </div>
-      ))}
+      )}
     </Card>
   );
 }

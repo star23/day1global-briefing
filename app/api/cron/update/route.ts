@@ -1,12 +1,15 @@
 // ========== 定时任务接口 ==========
 // Vercel Cron Job 每天定时调用此接口
 // 1. 获取最新市场数据
-// 2. 调用 Claude AI 生成中文市场分析
-// 3. 将分析结果存入 Upstash Redis 供前端读取
+// 2. 获取最新新闻
+// 3. 调用 Claude AI 生成中文市场分析 + 精选新闻
+// 4. 将分析结果存入 Upstash Redis 供前端读取
+// 5. 推送到 Telegram（可通过 ?skip_telegram=true 跳过）
 
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { generateMarketAnalysis } from "@/lib/generate-analysis";
+import { fetchNews } from "@/lib/fetch-news";
 import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
 
@@ -25,42 +28,60 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "未授权访问" }, { status: 401 });
   }
 
+  // 检查是否跳过 Telegram 推送（测试用）
+  const skipTelegram =
+    request.nextUrl.searchParams.get("skip_telegram") === "true";
+
   try {
     // ---- 第一步：获取最新市场数据 ----
-    const baseUrl = process.env.BASE_URL || (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+    const baseUrl =
+      process.env.BASE_URL ||
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000");
 
     const res = await fetch(`${baseUrl}/api/market-data`);
     const data: MarketDataResponse = await res.json();
 
     console.log(`[Cron] 市场数据获取成功: ${data.timestamp}`);
 
-    // ---- 第二步：调用 Claude AI 生成分析 ----
+    // ---- 第二步：获取最新新闻 ----
+    const rawNews = await fetchNews();
+    console.log(`[Cron] 新闻获取完成: ${rawNews.length} 条`);
+
+    // ---- 第三步：调用 Claude AI 生成分析 ----
     let analysisGenerated = false;
     let telegramPushed = false;
+    let newsCount = 0;
 
     // 只有配置了 API Key 才尝试生成 AI 分析
     if (process.env.ANTHROPIC_API_KEY) {
       try {
         console.log("[Cron] 正在调用 Claude AI 生成市场分析...");
-        const analysis = await generateMarketAnalysis(data);
+        const analysis = await generateMarketAnalysis(data, rawNews);
+        newsCount = analysis.topNews.length;
 
-        // ---- 第三步：存入 Upstash Redis ----
+        // ---- 第四步：存入 Upstash Redis ----
         // 设置 24 小时过期（秒为单位），防止过期数据一直留着
         await redis.set("ai-analysis", analysis, { ex: 86400 });
 
-        console.log(`[Cron] AI 分析已生成并存储: ${analysis.generatedAt}`);
+        console.log(
+          `[Cron] AI 分析已生成并存储: ${analysis.generatedAt}，精选新闻 ${newsCount} 条`
+        );
         analysisGenerated = true;
 
-        // ---- 第四步：推送到 Telegram ----
-        try {
-          telegramPushed = await pushTelegramBriefing(data, analysis);
-          if (telegramPushed) {
-            console.log("[Cron] Telegram 推送成功");
+        // ---- 第五步：推送到 Telegram ----
+        if (!skipTelegram) {
+          try {
+            telegramPushed = await pushTelegramBriefing(data, analysis);
+            if (telegramPushed) {
+              console.log("[Cron] Telegram 推送成功");
+            }
+          } catch (tgErr) {
+            console.error("[Cron] Telegram 推送失败:", tgErr);
           }
-        } catch (tgErr) {
-          console.error("[Cron] Telegram 推送失败:", tgErr);
+        } else {
+          console.log("[Cron] skip_telegram=true，跳过 Telegram 推送");
         }
       } catch (aiErr) {
         // AI 生成失败不影响整体流程，市场数据更新仍然成功
@@ -74,8 +95,14 @@ export async function GET(request: NextRequest) {
       success: true,
       timestamp: data.timestamp,
       message: "数据已更新",
-      aiAnalysis: analysisGenerated ? "已生成" : "未生成（缺少 API Key 或生成失败）",
-      telegram: telegramPushed ? "已推送" : "未推送",
+      aiAnalysis: analysisGenerated
+        ? `已生成（含 ${newsCount} 条精选新闻）`
+        : "未生成（缺少 API Key 或生成失败）",
+      telegram: skipTelegram
+        ? "已跳过（skip_telegram=true）"
+        : telegramPushed
+          ? "已推送"
+          : "未推送",
     });
   } catch (err) {
     console.error("[Cron] 数据更新失败:", err);
