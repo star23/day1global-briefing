@@ -55,7 +55,7 @@ export async function GET() {
     }),
     fetchBTCMetrics().catch((err) => {
       console.error("获取 BTC metrics 失败:", err);
-      return { weeklyRsi: null, volume24h: null, volumeChangePercent: null, mvrv: null, lthSupplyPercent: null };
+      return { weeklyRsi: null, volume24h: null, volumeChangePercent: null, sthSopr: null, lthSopr: null, lthSupplyPercent: null, wma200Price: null, wma200Multiplier: null };
     }),
   ]);
 
