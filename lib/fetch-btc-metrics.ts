@@ -1,5 +1,5 @@
 // ========== 获取 BTC 链上/技术指标 ==========
-// 从 CoinGecko 获取价格历史计算 RSI 和成交量变化
+// 从 OKX 获取 K 线数据计算周线 RSI 和成交量变化
 
 export interface BTCMetrics {
   weeklyRsi: number | null;           // 14 周期周线 RSI
@@ -47,33 +47,6 @@ function calculateRSI(closes: number[], period: number = 14): number | null {
   return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
 }
 
-/** 将日线数据重采样为周线（取每周最后一个收盘价） */
-function resampleToWeekly(dailyPrices: [number, number][]): number[] {
-  if (dailyPrices.length === 0) return [];
-
-  const weeklyCloses: number[] = [];
-  let currentWeek = -1;
-  let lastPrice = 0;
-
-  for (const [timestamp, price] of dailyPrices) {
-    const date = new Date(timestamp);
-    // ISO week number
-    const oneJan = new Date(date.getFullYear(), 0, 1);
-    const week = Math.ceil(((date.getTime() - oneJan.getTime()) / 86400000 + oneJan.getDay() + 1) / 7);
-    const yearWeek = date.getFullYear() * 100 + week;
-
-    if (yearWeek !== currentWeek && currentWeek !== -1) {
-      weeklyCloses.push(lastPrice);
-    }
-    currentWeek = yearWeek;
-    lastPrice = price;
-  }
-  // 推入最后一周
-  weeklyCloses.push(lastPrice);
-
-  return weeklyCloses;
-}
-
 /** 获取 BTC 技术指标 */
 export async function fetchBTCMetrics(): Promise<BTCMetrics> {
   const defaultMetrics: BTCMetrics = {
@@ -85,38 +58,54 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
   };
 
   try {
-    // 获取 150 天日线数据用于计算周线 RSI（需要约 15+ 周数据）
-    const url =
-      "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=150&interval=daily";
-
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (!res.ok) {
-      console.error(`CoinGecko market_chart 请求失败: ${res.status}`);
-      return defaultMetrics;
-    }
-
-    const data = await res.json();
+    // 并发获取周线和日线 K 线数据
+    const [weeklyRes, dailyRes] = await Promise.all([
+      // 周线 K 线（最近 30 根，用于计算 14 周期 RSI）
+      fetch(
+        "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1W&limit=30"
+      ),
+      // 日线 K 线（最近 31 根，用于成交量分析）
+      fetch(
+        "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1D&limit=31"
+      ),
+    ]);
 
     // --- 周线 RSI ---
-    const weeklyCloses = resampleToWeekly(data.prices || []);
-    const weeklyRsi = calculateRSI(weeklyCloses, 14);
+    let weeklyRsi: number | null = null;
+    if (weeklyRes.ok) {
+      const weeklyData = await weeklyRes.json();
+      if (weeklyData.code === "0" && weeklyData.data?.length > 0) {
+        // OKX 返回最新的在前，需要反转为时间正序
+        const weeklyCloses = weeklyData.data
+          .reverse()
+          .map((candle: string[]) => parseFloat(candle[4])); // index 4 = close
+        weeklyRsi = calculateRSI(weeklyCloses, 14);
+      }
+    }
 
     // --- 成交量分析 ---
-    const volumes: number[] = (data.total_volumes || []).map(
-      (v: [number, number]) => v[1]
-    );
-    const volume24h = volumes.length > 0 ? volumes[volumes.length - 1] : null;
-
+    let volume24h: number | null = null;
     let volumeChangePercent: number | null = null;
-    if (volumes.length >= 30) {
-      const last30 = volumes.slice(-30);
-      const avg30d = last30.reduce((a, b) => a + b, 0) / last30.length;
-      if (avg30d > 0 && volume24h !== null) {
-        volumeChangePercent =
-          Math.round(((volume24h - avg30d) / avg30d) * 100 * 10) / 10;
+    if (dailyRes.ok) {
+      const dailyData = await dailyRes.json();
+      if (dailyData.code === "0" && dailyData.data?.length > 0) {
+        // OKX 返回最新的在前，需要反转为时间正序
+        // index 7 = volCcyQuote（以 USDT 计价的成交额）
+        const volumes = dailyData.data
+          .reverse()
+          .map((candle: string[]) => parseFloat(candle[7]));
+
+        volume24h = volumes[volumes.length - 1];
+
+        if (volumes.length >= 30) {
+          const last30 = volumes.slice(-30);
+          const avg30d =
+            last30.reduce((a: number, b: number) => a + b, 0) / last30.length;
+          if (avg30d > 0 && volume24h !== null) {
+            volumeChangePercent =
+              Math.round(((volume24h - avg30d) / avg30d) * 100 * 10) / 10;
+          }
+        }
       }
     }
 

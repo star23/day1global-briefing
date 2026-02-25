@@ -1,80 +1,38 @@
 // ========== 获取美股数据 ==========
-// 使用 Yahoo Finance 非官方 API 获取股票和指数的实时价格
+// 股票报价使用 Finnhub API（需要免费 API Key）
+// VIX 和黄金指数仍使用 Yahoo Finance（Finnhub 免费版不支持期货/指数）
 
 import { StockData, IndexData } from "./types";
 
 // 需要获取的美股标的列表
 const STOCK_SYMBOLS = ["VOO", "QQQM", "NVDA", "TSLA", "GOOG", "RKLB", "CRCL", "HOOD", "COIN"];
 
-// 指数和商品代码（VIX 波动率指数、黄金期货）
-const INDEX_SYMBOLS = ["^VIX", "GC=F"];
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
-/** 请求重试：如果请求失败，最多重试3次，每次间隔递增 */
-async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          // Yahoo Finance 需要 User-Agent，否则可能被拒绝
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      });
-      if (res.ok) return res;
-      // 如果是429（请求过多），等待更长时间再重试
-      if (res.status === 429) {
-        await new Promise((r) => setTimeout(r, (i + 1) * 2000));
-        continue;
-      }
-      return res;
-    } catch (err) {
-      if (i === retries - 1) throw err;
-      // 等待后重试（指数退避：1秒、2秒、3秒）
-      await new Promise((r) => setTimeout(r, (i + 1) * 1000));
-    }
-  }
-  throw new Error("重试次数已用完");
-}
-
-/** 解析 Yahoo Finance 返回的市场状态 */
-function parseMarketState(state: string): StockData["marketState"] {
-  switch (state) {
-    case "PRE":
-      return "pre";
-    case "REGULAR":
-      return "regular";
-    case "POST":
-    case "POSTPOST":
-      return "post";
-    default:
-      return "closed";
-  }
-}
-
-/** 从 Yahoo Finance 获取单个标的的数据 */
-async function fetchYahooSymbol(
+/** 从 Finnhub 获取单只股票报价 */
+async function fetchFinnhubQuote(
   symbol: string
-): Promise<{ price: number; changePercent: number; marketState: string } | null> {
+): Promise<{ price: number; changePercent: number } | null> {
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
-    const res = await fetchWithRetry(url);
+    const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`;
+    const res = await fetch(url);
 
     if (!res.ok) {
-      console.error(`Yahoo Finance 请求失败 [${symbol}]: ${res.status}`);
+      console.error(`Finnhub 请求失败 [${symbol}]: ${res.status}`);
       return null;
     }
 
     const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
 
-    if (!meta) {
-      console.error(`Yahoo Finance 数据解析失败 [${symbol}]`);
+    // Finnhub 返回 c=0 表示未找到该标的
+    if (!data.c || data.c === 0) {
+      console.error(`Finnhub 无数据 [${symbol}]`);
       return null;
     }
 
     return {
-      price: meta.regularMarketPrice ?? 0,
-      changePercent: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
-      marketState: meta.marketState ?? "CLOSED",
+      price: data.c,   // current price
+      changePercent: data.dp, // percent change from previous close
     };
   } catch (err) {
     console.error(`获取 ${symbol} 数据出错:`, err);
@@ -82,24 +40,83 @@ async function fetchYahooSymbol(
   }
 }
 
+/** 获取美股市场状态（盘中/休市） */
+async function fetchMarketStatus(): Promise<StockData["marketState"]> {
+  try {
+    const url = `https://finnhub.io/api/v1/stock/market-status?exchange=US&token=${FINNHUB_API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return "closed";
+
+    const data = await res.json();
+    if (data.isOpen) return "regular";
+    return "closed";
+  } catch {
+    return "closed";
+  }
+}
+
 /** 获取所有美股数据，返回 { 股票代码: 数据 } 的映射 */
-export async function fetchAllStocks(): Promise<{ [ticker: string]: StockData }> {
+export async function fetchAllStocks(): Promise<{
+  [ticker: string]: StockData;
+}> {
+  if (!FINNHUB_API_KEY) {
+    console.error("FINNHUB_API_KEY 未设置");
+    return {};
+  }
+
   const results: { [ticker: string]: StockData } = {};
 
-  // 并发请求所有股票数据（提高速度）
-  const promises = STOCK_SYMBOLS.map(async (symbol) => {
-    const data = await fetchYahooSymbol(symbol);
+  // 并发获取市场状态和所有股票报价
+  const [marketState, ...quotes] = await Promise.all([
+    fetchMarketStatus(),
+    ...STOCK_SYMBOLS.map((symbol) => fetchFinnhubQuote(symbol)),
+  ]);
+
+  STOCK_SYMBOLS.forEach((symbol, i) => {
+    const data = quotes[i];
     if (data) {
       results[symbol] = {
         price: data.price,
         changePercent: data.changePercent,
-        marketState: parseMarketState(data.marketState),
+        marketState,
       };
     }
   });
 
-  await Promise.all(promises);
   return results;
+}
+
+// ---- VIX 和黄金：仍使用 Yahoo Finance ----
+
+/** 从 Yahoo Finance 获取单个指数/商品数据 */
+async function fetchYahooSymbol(
+  symbol: string
+): Promise<{ price: number; changePercent: number } | null> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+
+    return {
+      price: meta.regularMarketPrice ?? 0,
+      changePercent:
+        ((meta.regularMarketPrice - meta.chartPreviousClose) /
+          meta.chartPreviousClose) *
+        100,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** 获取指数数据（VIX 和黄金） */
@@ -113,7 +130,11 @@ export async function fetchIndices(): Promise<{
   ]);
 
   return {
-    vix: vixData ? { price: vixData.price, changePercent: vixData.changePercent } : null,
-    gold: goldData ? { price: goldData.price, changePercent: goldData.changePercent } : null,
+    vix: vixData
+      ? { price: vixData.price, changePercent: vixData.changePercent }
+      : null,
+    gold: goldData
+      ? { price: goldData.price, changePercent: goldData.changePercent }
+      : null,
   };
 }
