@@ -69,12 +69,33 @@ async function fetchCoinGlassLatest(
       return null;
     }
     const json = await res.json();
-    if (json.code !== "0" || !json.data || json.data.length === 0) {
+    // DEBUG: 输出完整响应结构
+    console.log(`[CoinGlass] ${label} 响应:`, JSON.stringify({
+      code: json.code,
+      msg: json.msg,
+      dataType: Array.isArray(json.data) ? "array" : typeof json.data,
+      dataLength: Array.isArray(json.data) ? json.data.length : undefined,
+      firstItem: Array.isArray(json.data) && json.data.length > 0 ? json.data[0] : undefined,
+      lastItem: Array.isArray(json.data) && json.data.length > 0 ? json.data[json.data.length - 1] : undefined,
+      rawDataPreview: !Array.isArray(json.data) ? json.data : undefined,
+    }));
+    if (json.code !== "0" || !json.data) {
       console.error(`[CoinGlass] ${label} 数据异常:`, json.msg || "无数据");
       return null;
     }
-    // 取最新一条（数组最后一个元素）
-    return json.data[json.data.length - 1];
+    // data 可能是数组或对象
+    if (Array.isArray(json.data)) {
+      if (json.data.length === 0) {
+        console.error(`[CoinGlass] ${label} 数据为空数组`);
+        return null;
+      }
+      return json.data[json.data.length - 1];
+    }
+    // 如果 data 直接就是对象
+    if (typeof json.data === "object") {
+      return json.data;
+    }
+    return null;
   } catch (err) {
     console.error(`[CoinGlass] 获取 ${label} 出错:`, err);
     return null;
@@ -100,20 +121,33 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   // --- STH-SOPR ---
   let sthSopr: number | null = null;
   if (sthSoprData) {
-    const v = Number(sthSoprData.sopr ?? sthSoprData.value);
-    if (!isNaN(v)) {
+    console.log("[CoinGlass] STH-SOPR 原始数据:", JSON.stringify(sthSoprData));
+    // 尝试多种可能的字段名
+    const v = Number(
+      sthSoprData.sopr ?? sthSoprData.value ?? sthSoprData.sth_sopr ??
+      sthSoprData.STH_SOPR ?? sthSoprData.ratio
+    );
+    if (!isNaN(v) && v > 0) {
       sthSopr = Math.round(v * 1000) / 1000;
       console.log(`[CoinGlass] STH-SOPR = ${sthSopr}`);
+    } else {
+      console.error(`[CoinGlass] STH-SOPR 无法解析值, v=${v}`);
     }
   }
 
   // --- LTH-SOPR ---
   let lthSopr: number | null = null;
   if (lthSoprData) {
-    const v = Number(lthSoprData.sopr ?? lthSoprData.value);
-    if (!isNaN(v)) {
+    console.log("[CoinGlass] LTH-SOPR 原始数据:", JSON.stringify(lthSoprData));
+    const v = Number(
+      lthSoprData.sopr ?? lthSoprData.value ?? lthSoprData.lth_sopr ??
+      lthSoprData.LTH_SOPR ?? lthSoprData.ratio
+    );
+    if (!isNaN(v) && v > 0) {
       lthSopr = Math.round(v * 1000) / 1000;
       console.log(`[CoinGlass] LTH-SOPR = ${lthSopr}`);
+    } else {
+      console.error(`[CoinGlass] LTH-SOPR 无法解析值, v=${v}`);
     }
   }
 
