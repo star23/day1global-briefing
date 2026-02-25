@@ -1,6 +1,6 @@
 // ========== 获取 BTC 链上/技术指标 ==========
 // 从 OKX 获取 K 线数据计算周线 RSI 和成交量变化
-// 从 CoinGlass 获取 MVRV 比率和长期持有者供应占比
+// 从 CoinGlass 获取 SOPR + Supply 数据，计算加权 MVRV 近似值和长期持有者供应占比
 
 export interface BTCMetrics {
   weeklyRsi: number | null;           // 14 周期周线 RSI
@@ -54,67 +54,137 @@ function calculateRSI(closes: number[], period: number = 14): number | null {
   return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
 }
 
-/** 从 CoinGlass 获取 MVRV 比率（最新值） */
-async function fetchMVRV(apiKey: string): Promise<number | null> {
+/** 从 CoinGlass 获取单个端点的最新数据记录 */
+async function fetchCoinGlassLatest(
+  apiKey: string,
+  endpoint: string,
+  label: string
+): Promise<Record<string, number> | null> {
   try {
-    const res = await fetch(
-      `${COINGLASS_BASE}/api/index/bitcoin-mvrv`,
-      { headers: { "CG-API-KEY": apiKey, accept: "application/json" } }
-    );
+    const res = await fetch(`${COINGLASS_BASE}/api/index/${endpoint}`, {
+      headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+    });
     if (!res.ok) {
-      console.error(`[CoinGlass] MVRV 请求失败: ${res.status}`);
+      console.error(`[CoinGlass] ${label} 请求失败: ${res.status}`);
       return null;
     }
     const json = await res.json();
     if (json.code !== "0" || !json.data || json.data.length === 0) {
-      console.error("[CoinGlass] MVRV 数据异常:", json.msg || "无数据");
+      console.error(`[CoinGlass] ${label} 数据异常:`, json.msg || "无数据");
       return null;
     }
-    // 取最新一条（数组最后一个或第一个，取决于排序）
-    const latest = json.data[json.data.length - 1];
-    // 字段可能是 mvrv 或 mvrv_ratio
-    const value = latest.mvrv ?? latest.mvrv_ratio ?? null;
-    if (value !== null) {
-      console.log(`[CoinGlass] MVRV = ${value}`);
-      return Math.round(value * 100) / 100;
-    }
-    return null;
+    return json.data[json.data.length - 1];
   } catch (err) {
-    console.error("[CoinGlass] 获取 MVRV 出错:", err);
+    console.error(`[CoinGlass] 获取 ${label} 出错:`, err);
     return null;
   }
 }
 
-/** 从 CoinGlass 获取长期持有者供应占比（最新值） */
-async function fetchLTHSupply(apiKey: string): Promise<number | null> {
-  try {
-    const res = await fetch(
-      `${COINGLASS_BASE}/api/index/bitcoin-long-term-holder-supply`,
-      { headers: { "CG-API-KEY": apiKey, accept: "application/json" } }
+/**
+ * 从 CoinGlass 获取链上指标，计算 MVRV 和 LTH 供应占比
+ *
+ * MVRV 计算方式：
+ *   Realized Price = (STH_RP × STH_Supply + LTH_RP × LTH_Supply) / (STH_Supply + LTH_Supply)
+ *   MVRV = Current Price / Realized Price
+ *
+ * LTH Supply% = LTH_Supply / (STH_Supply + LTH_Supply) × 100
+ */
+async function fetchOnChainMetrics(
+  apiKey: string
+): Promise<{ mvrv: number | null; lthSupplyPercent: number | null }> {
+  // 并发请求 4 个端点
+  const [sthRPData, lthRPData, sthSupplyData, lthSupplyData] =
+    await Promise.all([
+      fetchCoinGlassLatest(
+        apiKey,
+        "bitcoin-sth-sopr",
+        "STH Realized Price"
+      ),
+      fetchCoinGlassLatest(
+        apiKey,
+        "bitcoin-lth-sopr",
+        "LTH Realized Price"
+      ),
+      fetchCoinGlassLatest(
+        apiKey,
+        "bitcoin-short-term-holder-supply",
+        "STH Supply"
+      ),
+      fetchCoinGlassLatest(
+        apiKey,
+        "bitcoin-long-term-holder-supply",
+        "LTH Supply"
+      ),
+    ]);
+
+  let mvrv: number | null = null;
+  let lthSupplyPercent: number | null = null;
+
+  // 提取 STH/LTH 供应量
+  const sthSupplyVal = sthSupplyData
+    ? Number(
+        sthSupplyData.short_term_holder_supply ?? sthSupplyData.supply
+      )
+    : NaN;
+  const lthSupplyVal = lthSupplyData
+    ? Number(
+        lthSupplyData.long_term_holder_supply ?? lthSupplyData.supply
+      )
+    : NaN;
+  const totalSupply =
+    !isNaN(sthSupplyVal) && !isNaN(lthSupplyVal)
+      ? sthSupplyVal + lthSupplyVal
+      : NaN;
+
+  // --- 计算 LTH Supply Percent ---
+  if (!isNaN(lthSupplyVal) && lthSupplyVal > 0) {
+    const denominator = !isNaN(totalSupply)
+      ? totalSupply
+      : BTC_APPROX_CIRCULATING;
+    lthSupplyPercent =
+      Math.round((lthSupplyVal / denominator) * 1000) / 10;
+    console.log(
+      `[CoinGlass] LTH Supply = ${lthSupplyVal.toLocaleString()} BTC (${lthSupplyPercent}%)`
     );
-    if (!res.ok) {
-      console.error(`[CoinGlass] LTH Supply 请求失败: ${res.status}`);
-      return null;
-    }
-    const json = await res.json();
-    if (json.code !== "0" || !json.data || json.data.length === 0) {
-      console.error("[CoinGlass] LTH Supply 数据异常:", json.msg || "无数据");
-      return null;
-    }
-    const latest = json.data[json.data.length - 1];
-    const supply = latest.long_term_holder_supply ?? null;
-    if (supply !== null && supply > 0) {
-      const percent = Math.round((supply / BTC_APPROX_CIRCULATING) * 1000) / 10;
-      console.log(
-        `[CoinGlass] LTH Supply = ${supply.toLocaleString()} BTC (${percent}%)`
-      );
-      return percent;
-    }
-    return null;
-  } catch (err) {
-    console.error("[CoinGlass] 获取 LTH Supply 出错:", err);
-    return null;
   }
+
+  // --- 计算 MVRV ---
+  // 提取 STH-SOPR / LTH-SOPR（已实现利润率）
+  const sthSOPR = sthRPData
+    ? Number(sthRPData.sopr ?? sthRPData.value)
+    : NaN;
+  const lthSOPR = lthRPData
+    ? Number(lthRPData.sopr ?? lthRPData.value)
+    : NaN;
+
+  // 获取当前价格（从任意端点的 price 字段）
+  const currentPrice = Number(
+    sthRPData?.price ??
+      lthRPData?.price ??
+      sthSupplyData?.price ??
+      lthSupplyData?.price
+  );
+
+  // 用 SOPR 加权近似 MVRV:
+  //   整体 SOPR ≈ (STH_SOPR × STH_Supply + LTH_SOPR × LTH_Supply) / Total_Supply
+  //   SOPR 反映已花费输出的盈亏比，加权后可作为 MVRV 的近似参考
+  if (
+    !isNaN(sthSOPR) &&
+    !isNaN(lthSOPR) &&
+    !isNaN(sthSupplyVal) &&
+    !isNaN(lthSupplyVal) &&
+    !isNaN(totalSupply) &&
+    totalSupply > 0
+  ) {
+    const weightedSOPR =
+      (sthSOPR * sthSupplyVal + lthSOPR * lthSupplyVal) / totalSupply;
+    mvrv = Math.round(weightedSOPR * 100) / 100;
+    console.log(
+      `[CoinGlass] MVRV(加权SOPR) = ${mvrv} (STH_SOPR: ${sthSOPR.toFixed(3)}, LTH_SOPR: ${lthSOPR.toFixed(3)}, Price: $${currentPrice.toLocaleString()})`
+    );
+  }
+
+  return { mvrv, lthSupplyPercent };
 }
 
 /** 获取 BTC 技术指标 */
@@ -131,7 +201,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     const coinglassKey = process.env.COINGLASS_API_KEY;
 
     // 并发获取所有数据源
-    const [weeklyRes, dailyRes, mvrv, lthSupplyPercent] = await Promise.all([
+    const [weeklyRes, dailyRes, onChainMetrics] = await Promise.all([
       // OKX: 周线 K 线（最近 30 根，用于计算 14 周期 RSI）
       fetch(
         "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1W&limit=30"
@@ -140,11 +210,12 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
       fetch(
         "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1D&limit=31"
       ),
-      // CoinGlass: MVRV
-      coinglassKey ? fetchMVRV(coinglassKey) : Promise.resolve(null),
-      // CoinGlass: LTH Supply
-      coinglassKey ? fetchLTHSupply(coinglassKey) : Promise.resolve(null),
+      // CoinGlass: MVRV（通过 SOPR + Supply 计算） & LTH Supply%
+      coinglassKey
+        ? fetchOnChainMetrics(coinglassKey)
+        : Promise.resolve({ mvrv: null, lthSupplyPercent: null }),
     ]);
+    const { mvrv, lthSupplyPercent } = onChainMetrics;
 
     if (!coinglassKey) {
       console.log("[CoinGlass] 未设置 COINGLASS_API_KEY，跳过链上指标获取");

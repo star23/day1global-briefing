@@ -827,12 +827,12 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
     ? (volChange < -50 ? COLORS.green : volChange < -20 ? COLORS.yellow : COLORS.muted)
     : COLORS.muted;
 
-  // MVRV
+  // MVRV（通过加权 SOPR 近似）
   const mvrv = metrics?.mvrv;
   const mvrvVal = mvrv !== null && mvrv !== undefined ? `${mvrv.toFixed(2)}` : "需链上数据源";
   const mvrvSignal = mvrv !== null && mvrv !== undefined
     ? (mvrv < 1.0 ? "MVRV<1.0 持有者整体亏损！" : mvrv < 1.5 ? "偏低但未跌破1.0" : "正常范围")
-    : "需接入 Glassnode/CryptoQuant";
+    : "待接入 CoinGlass API";
   const mvrvBadge = mvrv !== null && mvrv !== undefined
     ? (mvrv < 1.0 ? "✅ 触发" : mvrv < 1.5 ? "🟡 接近" : "⚪ 正常")
     : "⚪ 待接入";
@@ -845,7 +845,7 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
   const lthVal = lth !== null && lth !== undefined ? `${lth.toFixed(1)}%` : "需链上数据源";
   const lthSignal = lth !== null && lth !== undefined
     ? (lth > 70 ? "LTH持仓高——信心强" : "LTH持仓正常")
-    : "需接入 Glassnode/CryptoQuant";
+    : "待接入 CoinGlass API";
   const lthBadge = lth !== null && lth !== undefined
     ? (lth > 70 ? "✅ 触发" : "🟡 关注")
     : "⚪ 待接入";
