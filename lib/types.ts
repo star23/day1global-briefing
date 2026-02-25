@@ -33,8 +33,11 @@ export interface BTCMetrics {
   weeklyRsi: number | null;           // 14 周期周线 RSI
   volume24h: number | null;           // 24小时成交量 (USD)
   volumeChangePercent: number | null; // 成交量 vs 30日均量 变化百分比
-  mvrv: number | null;                // MVRV 比率
+  sthSopr: number | null;             // STH-SOPR 短期持有者已实现利润率
+  lthSopr: number | null;             // LTH-SOPR 长期持有者已实现利润率
   lthSupplyPercent: number | null;    // 长期持有者供应占比
+  wma200Price: number | null;         // 200 周均线价格
+  wma200Multiplier: number | null;    // 当前价格 / 200WMA 倍数
 }
 
 /** /api/market-data 返回的完整数据格式 */

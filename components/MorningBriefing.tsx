@@ -798,72 +798,153 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
   const metrics = data?.btcMetrics;
 
+  // --- 辅助：判断值是否有效 ---
+  const has = (v: number | null | undefined): v is number => v !== null && v !== undefined;
+
   // 周线 RSI
   const rsi = metrics?.weeklyRsi;
-  const rsiVal = rsi !== null && rsi !== undefined ? `${rsi}` : "计算中...";
-  const rsiSignal = rsi !== null && rsi !== undefined
+  const rsiVal = has(rsi) ? `${rsi}` : "计算中...";
+  const rsiSignal = has(rsi)
     ? (rsi < 30 ? "RSI<30 已进入超跌区域！" : rsi < 40 ? "RSI偏低，接近超跌" : "RSI在正常范围")
     : "等待数据";
-  const rsiBadge = rsi !== null && rsi !== undefined
+  const rsiBadge = has(rsi)
     ? (rsi < 30 ? "✅ 触发" : rsi < 40 ? "🟡 接近" : "⚪ 正常")
     : "⚪ 待确认";
-  const rsiColor = rsi !== null && rsi !== undefined
+  const rsiColor = has(rsi)
     ? (rsi < 30 ? COLORS.green : rsi < 40 ? COLORS.yellow : COLORS.muted)
     : COLORS.muted;
 
   // 成交量变化
   const volChange = metrics?.volumeChangePercent;
   const vol24h = metrics?.volume24h;
-  const volVal = vol24h !== null && vol24h !== undefined
-    ? `$${(vol24h / 1e9).toFixed(1)}B (${volChange !== null && volChange !== undefined ? `${volChange > 0 ? "+" : ""}${volChange.toFixed(0)}%` : "N/A"} vs 30d均值)`
+  const volVal = has(vol24h)
+    ? `$${(vol24h / 1e9).toFixed(1)}B (${has(volChange) ? `${volChange > 0 ? "+" : ""}${volChange.toFixed(0)}%` : "N/A"} vs 30d均值)`
     : "获取中...";
-  const volSignal = volChange !== null && volChange !== undefined
+  const volSignal = has(volChange)
     ? (volChange < -50 ? "成交量极度萎缩=卖盘枯竭" : volChange < -20 ? "成交量萎缩，接近底部特征" : "成交量正常")
     : "等待数据";
-  const volBadge = volChange !== null && volChange !== undefined
+  const volBadge = has(volChange)
     ? (volChange < -50 ? "✅ 触发" : volChange < -20 ? "🟡 接近" : "⚪ 正常")
     : "⚪ 待确认";
-  const volColor = volChange !== null && volChange !== undefined
+  const volColor = has(volChange)
     ? (volChange < -50 ? COLORS.green : volChange < -20 ? COLORS.yellow : COLORS.muted)
     : COLORS.muted;
 
-  // MVRV（通过加权 SOPR 近似）
-  const mvrv = metrics?.mvrv;
-  const mvrvVal = mvrv !== null && mvrv !== undefined ? `${mvrv.toFixed(2)}` : "需链上数据源";
-  const mvrvSignal = mvrv !== null && mvrv !== undefined
-    ? (mvrv < 1.0 ? "MVRV<1.0 持有者整体亏损！" : mvrv < 1.5 ? "偏低但未跌破1.0" : "正常范围")
-    : "待接入 CoinGlass API";
-  const mvrvBadge = mvrv !== null && mvrv !== undefined
-    ? (mvrv < 1.0 ? "✅ 触发" : mvrv < 1.5 ? "🟡 接近" : "⚪ 正常")
+  // STH-SOPR（短期持有者已实现利润率）
+  const sthSopr = metrics?.sthSopr;
+  const sthSoprVal = has(sthSopr) ? sthSopr.toFixed(3) : "数据暂不可用";
+  const sthSoprSignal = has(sthSopr)
+    ? (sthSopr < 0.90 ? "极度恐慌抛售" : sthSopr < 0.95 ? "短期持有者亏损卖出" : sthSopr < 1.00 ? "接近盈亏平衡" : sthSopr < 1.05 ? "正常获利" : "短期过热")
+    : "等待CoinGlass数据";
+  const sthSoprBadge = has(sthSopr)
+    ? (sthSopr < 0.90 ? "🟢🟢 强底" : sthSopr < 0.95 ? "🟢 抄底" : sthSopr < 1.00 ? "🟡 关注" : sthSopr < 1.05 ? "⚪ 中性" : "🔴 谨慎")
     : "⚪ 待接入";
-  const mvrvColor = mvrv !== null && mvrv !== undefined
-    ? (mvrv < 1.0 ? COLORS.green : mvrv < 1.5 ? COLORS.yellow : COLORS.muted)
+  const sthSoprColor = has(sthSopr)
+    ? (sthSopr < 0.95 ? COLORS.green : sthSopr < 1.00 ? COLORS.yellow : sthSopr >= 1.05 ? COLORS.red : COLORS.muted)
     : COLORS.muted;
 
-  // LTH
+  // LTH-SOPR（长期持有者已实现利润率）
+  const lthSopr = metrics?.lthSopr;
+  const lthSoprVal = has(lthSopr) ? lthSopr.toFixed(3) : "数据暂不可用";
+  const lthSoprSignal = has(lthSopr)
+    ? (lthSopr < 0.95 ? "长期持有者投降——历史级底部！" : lthSopr < 1.00 ? "长期持有者承压——底部区域" : lthSopr < 2.00 ? "正常分配" : lthSopr < 3.00 ? "大规模获利了结——接近顶部" : "极端获利了结——强烈见顶")
+    : "等待CoinGlass数据";
+  const lthSoprBadge = has(lthSopr)
+    ? (lthSopr < 0.95 ? "🟢🟢 历史底" : lthSopr < 1.00 ? "🟢 底部" : lthSopr < 2.00 ? "⚪ 中性" : lthSopr < 3.00 ? "🟡 见顶" : "🔴 顶部")
+    : "⚪ 待接入";
+  const lthSoprColor = has(lthSopr)
+    ? (lthSopr < 1.00 ? COLORS.green : lthSopr < 2.00 ? COLORS.muted : lthSopr < 3.00 ? COLORS.yellow : COLORS.red)
+    : COLORS.muted;
+
+  // LTH Supply
   const lth = metrics?.lthSupplyPercent;
-  const lthVal = lth !== null && lth !== undefined ? `${lth.toFixed(1)}%` : "需链上数据源";
-  const lthSignal = lth !== null && lth !== undefined
+  const lthVal = has(lth) ? `${lth.toFixed(1)}%` : "数据暂不可用";
+  const lthSignal = has(lth)
     ? (lth > 70 ? "LTH持仓高——信心强" : "LTH持仓正常")
-    : "待接入 CoinGlass API";
-  const lthBadge = lth !== null && lth !== undefined
+    : "等待CoinGlass数据";
+  const lthBadge = has(lth)
     ? (lth > 70 ? "✅ 触发" : "🟡 关注")
     : "⚪ 待接入";
-  const lthColor = lth !== null && lth !== undefined
+  const lthColor = has(lth)
     ? (lth > 70 ? COLORS.green : COLORS.yellow)
+    : COLORS.muted;
+
+  // 200 WMA
+  const wma200 = metrics?.wma200Multiplier;
+  const wma200Price = metrics?.wma200Price;
+  const wma200Val = has(wma200) ? `${wma200.toFixed(2)}x` : "数据暂不可用";
+  const wma200Signal = has(wma200)
+    ? (wma200 < 1.0 ? "低于200周均线——历史级底部！" : wma200 < 1.2 ? "接近200周均线支撑" : wma200 < 2.0 ? "正常上涨趋势" : wma200 < 3.5 ? "显著偏离均线——过热" : "极端偏离——周期顶部")
+    : "等待CoinGlass数据";
+  const wma200Badge = has(wma200)
+    ? (wma200 < 1.0 ? "🟢🟢 历史底" : wma200 < 1.2 ? "🟢 抄底" : wma200 < 2.0 ? "⚪ 正常" : wma200 < 3.5 ? "🟡 过热" : "🔴 顶部")
+    : "⚪ 待接入";
+  const wma200Color = has(wma200)
+    ? (wma200 < 1.2 ? COLORS.green : wma200 < 2.0 ? COLORS.muted : wma200 < 3.5 ? COLORS.yellow : COLORS.red)
     : COLORS.muted;
 
   const btcIndicators = [
     { name: "周线RSI", val: rsiVal, signal: rsiSignal, badge: rsiBadge, color: rsiColor },
     { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor },
-    { name: "MVRV比率", val: mvrvVal, signal: mvrvSignal, badge: mvrvBadge, color: mvrvColor },
+    { name: "STH-SOPR", val: sthSoprVal, signal: sthSoprSignal, badge: sthSoprBadge, color: sthSoprColor },
+    { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor },
     { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted },
+    { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor },
     { name: "矿机关机价", val: "~$55-60K参考", signal: "接近中效矿机成本线时关注", badge: "📊 参考", color: COLORS.muted },
-    { name: "LTH长期持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor },
   ];
 
-  const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发")).length;
-  const nearCount = btcIndicators.filter(i => i.badge.includes("接近")).length;
+  const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发") || i.badge.includes("强底") || i.badge.includes("历史底") || i.badge.includes("抄底") || i.badge.includes("底部")).length;
+  const topCount = btcIndicators.filter(i => i.badge.includes("谨慎") || i.badge.includes("见顶") || i.badge.includes("顶部") || i.badge.includes("过热")).length;
+
+  // --- 综合抄底评分 ---
+  const scores: number[] = [];
+  // STH-SOPR 评分
+  if (has(sthSopr)) {
+    if (sthSopr < 0.90) scores.push(100);
+    else if (sthSopr < 0.95) scores.push(80);
+    else if (sthSopr < 1.00) scores.push(60);
+    else if (sthSopr < 1.05) scores.push(30);
+    else scores.push(0);
+  }
+  // LTH-SOPR 评分
+  if (has(lthSopr)) {
+    if (lthSopr < 0.95) scores.push(100);
+    else if (lthSopr < 1.00) scores.push(80);
+    else if (lthSopr < 2.00) scores.push(50);
+    else if (lthSopr < 3.00) scores.push(20);
+    else scores.push(0);
+  }
+  // 恐慌贪婪指数评分
+  if (fearGreed <= 10) scores.push(100);
+  else if (fearGreed <= 25) scores.push(80);
+  else if (fearGreed <= 40) scores.push(50);
+  else scores.push(20);
+  // 周线 RSI 评分
+  if (has(rsi)) {
+    if (rsi < 30) scores.push(100);
+    else if (rsi < 40) scores.push(70);
+    else if (rsi < 50) scores.push(40);
+    else scores.push(10);
+  }
+  // 200WMA 评分
+  if (has(wma200)) {
+    if (wma200 < 1.0) scores.push(100);
+    else if (wma200 < 1.2) scores.push(80);
+    else if (wma200 < 2.0) scores.push(50);
+    else if (wma200 < 3.5) scores.push(20);
+    else scores.push(0);
+  }
+  // LTH Supply 评分
+  if (has(lth)) {
+    if (lth > 70) scores.push(80);
+    else if (lth > 60) scores.push(50);
+    else scores.push(30);
+  }
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+    : 0;
+  const scoreLabel = avgScore >= 80 ? "强烈抄底" : avgScore >= 60 ? "偏强" : avgScore >= 40 ? "中性偏强" : avgScore >= 20 ? "中性" : "偏顶部";
+  const scoreColor = avgScore >= 80 ? COLORS.green : avgScore >= 60 ? COLORS.green : avgScore >= 40 ? COLORS.yellow : avgScore >= 20 ? COLORS.muted : COLORS.red;
 
   return (
     <>
@@ -896,7 +977,7 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
               <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
                 <td style={{ padding: "8px 6px", fontWeight: 600, color: COLORS.text }}>{r.name}</td>
                 <td style={{ padding: "8px 6px", color: COLORS.muted }}>{r.val}</td>
-                <td style={{ padding: "8px 6px", color: COLORS.muted }}>{r.signal}</td>
+                <td style={{ padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>{r.signal}</td>
                 <td style={{ padding: "8px 6px" }}><Badge color={r.color}>{r.badge}</Badge></td>
               </tr>
             ))}
@@ -904,15 +985,70 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
         </table>
       </Card>
 
+      {/* 200 周均线专项卡片 */}
+      <Card title="200 周均线 (200WMA)" icon="📐" accent={COLORS.purple}>
+        <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.8 }}>
+          {has(wma200Price) && has(wma200) ? (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>200WMA 价格</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>${wma200Price.toLocaleString()}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>当前价格/200WMA</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: wma200Color }}>{wma200.toFixed(2)}x</div>
+                </div>
+              </div>
+              {/* 刻度条 */}
+              <div style={{ position: "relative", height: 32, background: COLORS.dimBg, borderRadius: 6, overflow: "hidden", marginBottom: 4 }}>
+                {/* 渐变背景：绿→灰→黄→红 */}
+                <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to right, ${COLORS.green}44, ${COLORS.muted}22 30%, ${COLORS.yellow}44 60%, ${COLORS.red}44)`, borderRadius: 6 }} />
+                {/* 关键刻度线 */}
+                {[
+                  { pos: 1.0 / 4.0, label: "1.0" },
+                  { pos: 2.0 / 4.0, label: "2.0" },
+                  { pos: 3.5 / 4.0, label: "3.5" },
+                ].map((m) => (
+                  <div key={m.label} style={{ position: "absolute", left: `${m.pos * 100}%`, top: 0, bottom: 0, width: 1, background: `${COLORS.muted}66` }}>
+                    <span style={{ position: "absolute", top: -14, left: -8, fontSize: 9, color: COLORS.muted }}>{m.label}</span>
+                  </div>
+                ))}
+                {/* 当前位置指针 */}
+                <div style={{
+                  position: "absolute",
+                  left: `${Math.min(Math.max(wma200 / 4.0, 0), 1) * 100}%`,
+                  top: 4, bottom: 4,
+                  width: 4, borderRadius: 2,
+                  background: wma200Color,
+                  transform: "translateX(-2px)",
+                  boxShadow: `0 0 6px ${wma200Color}`,
+                }} />
+              </div>
+              <div style={{ fontSize: 11, color: wma200Color, fontWeight: 600, textAlign: "center" }}>
+                {wma200Signal}
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: "center", padding: 12, color: COLORS.muted }}>数据暂不可用</div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 11, color: COLORS.muted, borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8 }}>
+            200周均线是BTC最可靠的长期估值锚，历史上每次触及都是周期大底
+          </div>
+        </div>
+      </Card>
+
       <Card title="综合抄底评级" icon="🚦" accent={COLORS.orange}>
         <div style={{ textAlign: "center", margin: "8px 0" }}>
-          <div style={{ fontSize: 28, fontWeight: 900, color: fearGreed <= 10 ? COLORS.green : fearGreed <= 25 ? COLORS.orange : COLORS.yellow }}>
-            {fearGreed <= 10 ? "🟢 偏强" : fearGreed <= 25 ? "🟡 中等偏强" : "🟡 中等"}
+          <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor }}>
+            {avgScore >= 80 ? "🟢 " : avgScore >= 60 ? "🟢 " : avgScore >= 40 ? "🟡 " : avgScore >= 20 ? "⚪ " : "🔴 "}{scoreLabel}
           </div>
-          <div style={{ fontSize: 13, color: COLORS.muted }}>触发指标 {triggeredCount}/6（恐慌指数为核心参考）</div>
-          {nearCount > 0 && (
-            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>+ {nearCount}个指标&quot;接近触发&quot;</div>
-          )}
+          <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor }}>{avgScore} / 100</div>
+          <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
+            基于 {scores.length} 个维度评分{" "}
+            {triggeredCount > 0 && <span style={{ color: COLORS.green }}>({triggeredCount}个底部信号)</span>}
+            {topCount > 0 && <span style={{ color: COLORS.red }}>({topCount}个顶部信号)</span>}
+          </div>
         </div>
 
         {/* AI 分析 */}
@@ -927,11 +1063,11 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
           <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14, marginTop: 12, fontSize: 12, color: COLORS.muted, lineHeight: 1.8 }}>
             <div style={{ fontWeight: 700, color: COLORS.text, marginBottom: 6 }}>🎯 建仓参考：</div>
             <div>• 建议分批入场，避免一次性抄底</div>
-            <div>• 关注BTC周线RSI跌破30的超跌信号</div>
-            <div>• 等待MVRV跌至1.0附近或矿工投降信号</div>
-            <div>• 止损参考：周线收盘跌破矿机关机价区间</div>
+            <div>• 关注STH-SOPR跌破0.95（短期持有者亏损卖出信号）</div>
+            <div>• LTH-SOPR跌破1.0为底部区域，跌破0.95为历史级底部</div>
+            <div>• 200WMA倍数接近1.0时为长期最佳买入区间</div>
             <div style={{ marginTop: 8, color: COLORS.yellow }}>
-              ⚠️ 关注鲸鱼（大户）行为——如果大户仍在减持，散户在接盘，真正的底部可能需要更多时间。耐心等待！
+              ⚠️ 多个维度同时触发底部信号时，信号更可靠。耐心等待多维共振！
             </div>
           </div>
         )}
