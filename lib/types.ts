@@ -69,6 +69,28 @@ export interface NewsItem {
   url: string;         // 原文链接
 }
 
+/** BTC 指标历史快照（存储在 Postgres） */
+export interface MetricsSnapshot {
+  date: string;              // YYYY-MM-DD
+  btcPrice: number | null;
+  weeklyRsi: number | null;
+  volume24h: number | null;
+  volumeChangePct: number | null;
+  sthSopr: number | null;
+  lthSopr: number | null;
+  lthSupplyPct: number | null;
+  wma200Price: number | null;
+  wma200Multiplier: number | null;
+  fearGreed: number | null;
+}
+
+/** /api/metrics-history 返回的历史对比数据 */
+export interface MetricsHistoryResponse {
+  yesterday: MetricsSnapshot | null;
+  oneWeek: MetricsSnapshot | null;
+  oneMonth: MetricsSnapshot | null;
+}
+
 /** AI 生成的每日市场分析（由 Claude 生成，存储在 Vercel KV） */
 export interface AIAnalysis {
   macroAnalysis: string;      // 宏观判断

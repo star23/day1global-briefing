@@ -4,7 +4,7 @@
 
 import { useState, ReactNode } from "react";
 import useSWR from "swr";
-import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem } from "@/lib/types";
+import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem, MetricsHistoryResponse, MetricsSnapshot } from "@/lib/types";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -258,6 +258,12 @@ export default function MorningBriefing() {
     { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
   );
 
+  const { data: metricsHistory } = useSWR<MetricsHistoryResponse>(
+    "/api/metrics-history",
+    fetcher,
+    { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
+  );
+
   // 动态生成头部 Badge
   const headerBadges: { text: string; color: string }[] = [];
   if (data?.sentiment && data.sentiment.cryptoFearGreed <= 10) {
@@ -417,7 +423,7 @@ export default function MorningBriefing() {
           <>
             {activeTab === "overview" && <OverviewTab data={data} analysis={analysis} />}
             {activeTab === "sentiment" && <SentimentTab data={data} analysis={analysis} />}
-            {activeTab === "btc-bottom" && <BTCBottomTab data={data} analysis={analysis} />}
+            {activeTab === "btc-bottom" && <BTCBottomTab data={data} analysis={analysis} history={metricsHistory} />}
             {activeTab === "portfolio" && <PortfolioTab data={data} />}
             {activeTab === "news" && <NewsTab analysis={analysis} />}
           </>
@@ -725,8 +731,119 @@ function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?
   );
 }
 
+// ========== 历史对比卡片 ==========
+function HistoryComparisonCard({
+  currentMetrics,
+  currentFearGreed,
+  currentBtcPrice,
+  history,
+}: {
+  currentMetrics?: BTCMetrics;
+  currentFearGreed: number;
+  currentBtcPrice: number | null;
+  history?: MetricsHistoryResponse | null;
+}) {
+  const has = (v: number | null | undefined): v is number =>
+    v !== null && v !== undefined;
+
+  // 计算变化并渲染带颜色的 delta
+  function renderDelta(current: number | null | undefined, historical: number | null | undefined, inverted = false) {
+    if (!has(current) || !has(historical)) return <span style={{ color: COLORS.muted, fontSize: 11 }}>--</span>;
+    const diff = current - historical;
+    if (Math.abs(diff) < 0.001) return <span style={{ color: COLORS.muted, fontSize: 11 }}>0</span>;
+    const isPositive = diff > 0;
+    // inverted: 某些指标数值下降反而是利好（如恐慌指数下降 = 更恐慌 = 更接近底部）
+    const color = inverted
+      ? (isPositive ? COLORS.red : COLORS.green)
+      : (isPositive ? COLORS.green : COLORS.red);
+    const sign = isPositive ? "+" : "";
+    const formatted = Math.abs(diff) >= 100
+      ? `${sign}${Math.round(diff)}`
+      : Math.abs(diff) >= 1
+        ? `${sign}${diff.toFixed(1)}`
+        : `${sign}${diff.toFixed(3)}`;
+    return <span style={{ color, fontSize: 11, fontWeight: 600 }}>{formatted}</span>;
+  }
+
+  // 渲染快照中某指标的值
+  function snapshotVal(snapshot: MetricsSnapshot | null | undefined, key: keyof MetricsSnapshot) {
+    if (!snapshot) return null;
+    const v = snapshot[key];
+    return typeof v === "number" ? v : null;
+  }
+
+  const indicators: {
+    name: string;
+    currentVal: number | null | undefined;
+    snapshotKey: keyof MetricsSnapshot;
+    format: (v: number) => string;
+    inverted?: boolean; // true = 下降是利好
+  }[] = [
+    { name: "BTC 价格", currentVal: currentBtcPrice, snapshotKey: "btcPrice", format: (v) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` },
+    { name: "周线 RSI", currentVal: currentMetrics?.weeklyRsi, snapshotKey: "weeklyRsi", format: (v) => v.toFixed(1) },
+    { name: "STH-SOPR", currentVal: currentMetrics?.sthSopr, snapshotKey: "sthSopr", format: (v) => v.toFixed(3) },
+    { name: "LTH-SOPR", currentVal: currentMetrics?.lthSopr, snapshotKey: "lthSopr", format: (v) => v.toFixed(3) },
+    { name: "恐慌贪婪", currentVal: currentFearGreed, snapshotKey: "fearGreed", format: (v) => String(Math.round(v)), inverted: true },
+    { name: "LTH 占比", currentVal: currentMetrics?.lthSupplyPercent, snapshotKey: "lthSupplyPct", format: (v) => `${v.toFixed(1)}%` },
+    { name: "200WMA 倍数", currentVal: currentMetrics?.wma200Multiplier, snapshotKey: "wma200Multiplier", format: (v) => `${v.toFixed(2)}x` },
+  ];
+
+  const hasHistory = history && (history.yesterday || history.oneWeek || history.oneMonth);
+
+  return (
+    <Card title="历史对比" icon="📊" accent={COLORS.accent}>
+      {!hasHistory ? (
+        <div style={{ textAlign: "center", padding: 16, color: COLORS.muted, fontSize: 12 }}>
+          <div>暂无历史数据</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+            每日定时任务会自动存储指标快照，数据将在运行后逐步积累
+          </div>
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
+                <th style={{ textAlign: "left", padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>指标</th>
+                <th style={{ textAlign: "right", padding: "8px 6px", color: COLORS.text, fontSize: 11 }}>当前</th>
+                <th style={{ textAlign: "right", padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>vs 昨天</th>
+                <th style={{ textAlign: "right", padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>vs 1周前</th>
+                <th style={{ textAlign: "right", padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>vs 1月前</th>
+              </tr>
+            </thead>
+            <tbody>
+              {indicators.map((ind) => (
+                <tr key={ind.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
+                  <td style={{ padding: "8px 6px", fontWeight: 600, color: COLORS.text, fontSize: 12 }}>{ind.name}</td>
+                  <td style={{ padding: "8px 6px", textAlign: "right", color: COLORS.text, fontWeight: 600, fontSize: 12 }}>
+                    {has(ind.currentVal) ? ind.format(ind.currentVal) : "--"}
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    {renderDelta(ind.currentVal, snapshotVal(history?.yesterday, ind.snapshotKey), ind.inverted)}
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    {renderDelta(ind.currentVal, snapshotVal(history?.oneWeek, ind.snapshotKey), ind.inverted)}
+                  </td>
+                  <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                    {renderDelta(ind.currentVal, snapshotVal(history?.oneMonth, ind.snapshotKey), ind.inverted)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ fontSize: 10, color: "#64748b", marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {history?.yesterday?.date && <span>昨天: {history.yesterday.date}</span>}
+            {history?.oneWeek?.date && <span>1周前: {history.oneWeek.date}</span>}
+            {history?.oneMonth?.date && <span>1月前: {history.oneMonth.date}</span>}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ========== BTC 底部分析标签页 ==========
-function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
+function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; analysis?: AIAnalysis | null; history?: MetricsHistoryResponse | null }) {
   const btc = data?.crypto?.BTC;
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
   const metrics = data?.btcMetrics;
@@ -916,6 +1033,14 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
           </tbody>
         </table>
       </Card>
+
+      {/* 历史对比卡片 */}
+      <HistoryComparisonCard
+        currentMetrics={metrics}
+        currentFearGreed={fearGreed}
+        currentBtcPrice={btc?.price ?? null}
+        history={history}
+      />
 
       {/* 200 周均线专项卡片 */}
       <Card title="200 周均线 (200WMA)" icon="📐" accent={COLORS.purple}>
