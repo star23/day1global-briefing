@@ -24,6 +24,8 @@ export interface IndexData {
 export interface SentimentData {
   cryptoFearGreed: number;           // 加密恐慌贪婪指数 0-100
   cryptoFearGreedLabel: string;      // 文字标签（如 "Greed", "Fear"）
+  cryptoFearGreedPrev: number | null;   // 昨日恐慌贪婪指数
+  cryptoFearGreedChange: number | null; // 今日 - 昨日 变化
   cnnFearGreed: number | null;       // CNN 恐惧贪婪指数 0-100（美股情绪）
   cnnFearGreedLabel: string | null;  // CNN 文字标签
 }

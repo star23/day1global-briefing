@@ -47,7 +47,7 @@ export async function GET() {
     }),
     fetchFearGreedIndex().catch((err) => {
       console.error("获取恐慌贪婪指数失败:", err);
-      return { cryptoFearGreed: 50, cryptoFearGreedLabel: "Neutral", cnnFearGreed: null, cnnFearGreedLabel: null };
+      return { cryptoFearGreed: 50, cryptoFearGreedLabel: "Neutral", cryptoFearGreedPrev: null, cryptoFearGreedChange: null, cnnFearGreed: null, cnnFearGreedLabel: null };
     }),
     fetchCNNFearGreed().catch((err) => {
       console.error("获取 CNN Fear & Greed 失败:", err);

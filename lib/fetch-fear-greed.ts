@@ -1,16 +1,28 @@
 // ========== 获取加密恐慌贪婪指数 ==========
-// 使用 CoinGlass API（与 BTC 链上指标同一 API Key，数据更及时）
-// 兼容多种响应格式（并行数组 / 独立记录数组 / 单对象）
+// 使用 CoinGlass API（与 BTC 链上指标同一 API Key）
+// 响应格式: { code: "0", data: { data_list: [number...], price_list: [...], time_list: [...] } }
+// data_list 最后一个元素为最新值，倒数第二个为昨日值
 
 import { SentimentData } from "./types";
 
 const COINGLASS_BASE = "https://open-api-v4.coinglass.com";
+
+function getLabel(value: number): string {
+  if (value <= 10) return "Extreme Fear";
+  if (value <= 25) return "Fear";
+  if (value <= 45) return "Fear";
+  if (value <= 55) return "Neutral";
+  if (value <= 75) return "Greed";
+  return "Extreme Greed";
+}
 
 /** 获取加密市场恐慌贪婪指数（CoinGlass） */
 export async function fetchFearGreedIndex(): Promise<SentimentData> {
   const defaultData: SentimentData = {
     cryptoFearGreed: 50,
     cryptoFearGreedLabel: "Neutral",
+    cryptoFearGreedPrev: null,
+    cryptoFearGreedChange: null,
     cnnFearGreed: null,
     cnnFearGreedLabel: null,
   };
@@ -38,52 +50,30 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
       return defaultData;
     }
 
-    // CoinGlass 可能返回两种格式:
-    //   格式A (并行数组): { data: [{ values: [32, 23, ...], price: [...] }] }
-    //   格式B (独立记录): { data: [{ value: 32, price: 47886 }, ...] }
-    //   格式C (对象):     { data: { value: 32, ... } }
-    let value: number | undefined;
-
-    if (Array.isArray(json.data) && json.data.length > 0) {
-      const first = json.data[0];
-      if (Array.isArray(first.values) && first.values.length > 0) {
-        // 格式A: 并行数组，取最后一个元素
-        value = Number(first.values[first.values.length - 1]);
-        console.log(`[CoinGlass] Fear&Greed 格式A: values数组长度=${first.values.length}, 最新值=${value}`);
-      } else {
-        // 格式B: 独立记录数组，取最后一条的 value 字段
-        const last = json.data[json.data.length - 1];
-        value = Number(last.value ?? last.values ?? last.fear_greed ?? last.fearGreed);
-        console.log(`[CoinGlass] Fear&Greed 格式B: 记录数=${json.data.length}, 最后一条keys=[${Object.keys(last).join(",")}], 值=${value}`);
-      }
-    } else if (typeof json.data === "object" && json.data !== null) {
-      // 格式C: 直接对象
-      value = Number(json.data.value ?? json.data.values ?? json.data.fear_greed ?? json.data.fearGreed);
-      console.log(`[CoinGlass] Fear&Greed 格式C: keys=[${Object.keys(json.data).join(",")}], 值=${value}`);
-    } else {
-      console.error("[CoinGlass] 恐慌贪婪指数数据格式未知:", typeof json.data);
+    // 从 data.data_list 数组提取今日和昨日值
+    const dataList: number[] | undefined = json.data.data_list;
+    if (!Array.isArray(dataList) || dataList.length === 0) {
+      console.error("[CoinGlass] 恐慌贪婪指数 data_list 为空或缺失, keys:", Object.keys(json.data));
       return defaultData;
     }
 
-    if (value === undefined || isNaN(value)) {
-      console.error("[CoinGlass] 恐慌贪婪指数解析失败, raw data sample:", JSON.stringify(json.data).slice(0, 300));
+    const today = Math.round(Number(dataList[dataList.length - 1]));
+    const yesterday = dataList.length >= 2 ? Math.round(Number(dataList[dataList.length - 2])) : null;
+
+    if (isNaN(today)) {
+      console.error("[CoinGlass] 恐慌贪婪指数解析失败, 最后几条:", dataList.slice(-3));
       return defaultData;
     }
 
-    // 根据数值生成标签
-    const label =
-      value <= 10 ? "Extreme Fear" :
-      value <= 25 ? "Fear" :
-      value <= 45 ? "Fear" :
-      value <= 55 ? "Neutral" :
-      value <= 75 ? "Greed" :
-      "Extreme Greed";
+    const change = yesterday !== null && !isNaN(yesterday) ? today - yesterday : null;
 
-    console.log(`[CoinGlass] 恐慌贪婪指数 = ${value} (${label})`);
+    console.log(`[CoinGlass] 恐慌贪婪指数: 今日=${today} (${getLabel(today)}), 昨日=${yesterday}, 变化=${change}`);
 
     return {
-      cryptoFearGreed: Math.round(value),
-      cryptoFearGreedLabel: label,
+      cryptoFearGreed: today,
+      cryptoFearGreedLabel: getLabel(today),
+      cryptoFearGreedPrev: yesterday,
+      cryptoFearGreedChange: change,
       cnnFearGreed: null,
       cnnFearGreedLabel: null,
     };
