@@ -65,6 +65,7 @@ async function fetchCoinGlassLatest(
 ): Promise<Record<string, number> | null> {
   try {
     const res = await fetch(`${COINGLASS_BASE}/api/index/${endpoint}`, {
+      cache: 'no-store',
       headers: { "CG-API-KEY": apiKey, accept: "application/json" },
     });
     if (!res.ok) {

@@ -15,7 +15,7 @@ async function fetchFinnhubQuote(
 ): Promise<{ price: number; changePercent: number } | null> {
   try {
     const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
 
     if (!res.ok) {
       console.error(`Finnhub 请求失败 [${symbol}]: ${res.status}`);
@@ -44,7 +44,7 @@ async function fetchFinnhubQuote(
 async function fetchMarketStatus(): Promise<StockData["marketState"]> {
   try {
     const url = `https://finnhub.io/api/v1/stock/market-status?exchange=US&token=${FINNHUB_API_KEY}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return "closed";
 
     const data = await res.json();
@@ -95,6 +95,7 @@ async function fetchYahooSymbol(
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
     const res = await fetch(url, {
+      cache: 'no-store',
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
