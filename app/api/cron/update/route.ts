@@ -12,6 +12,7 @@ import { generateMarketAnalysis } from "@/lib/generate-analysis";
 import { fetchNews } from "@/lib/fetch-news";
 import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
+import { ensureTable, upsertDailyMetrics } from "@/lib/db";
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -44,6 +45,30 @@ export async function GET(request: NextRequest) {
     const data: MarketDataResponse = await res.json();
 
     console.log(`[Cron] 市场数据获取成功: ${data.timestamp}`);
+
+    // ---- 第 1.5 步：将 BTC 指标写入 Postgres ----
+    let metricsStored = false;
+    try {
+      await ensureTable();
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      await upsertDailyMetrics({
+        date: today,
+        btcPrice: data.crypto?.BTC?.price ?? null,
+        weeklyRsi: data.btcMetrics?.weeklyRsi ?? null,
+        volume24h: data.btcMetrics?.volume24h ?? null,
+        volumeChangePct: data.btcMetrics?.volumeChangePercent ?? null,
+        sthSopr: data.btcMetrics?.sthSopr ?? null,
+        lthSopr: data.btcMetrics?.lthSopr ?? null,
+        lthSupplyPct: data.btcMetrics?.lthSupplyPercent ?? null,
+        wma200Price: data.btcMetrics?.wma200Price ?? null,
+        wma200Multiplier: data.btcMetrics?.wma200Multiplier ?? null,
+        fearGreed: data.sentiment?.cryptoFearGreed ?? null,
+      });
+      metricsStored = true;
+      console.log(`[Cron] BTC 指标已写入 Postgres (${today})`);
+    } catch (dbErr) {
+      console.error("[Cron] 写入 Postgres 失败:", dbErr);
+    }
 
     // ---- 第二步：获取最新新闻 ----
     const rawNews = await fetchNews();
@@ -95,6 +120,7 @@ export async function GET(request: NextRequest) {
       success: true,
       timestamp: data.timestamp,
       message: "数据已更新",
+      metricsHistory: metricsStored ? "已写入" : "写入失败",
       aiAnalysis: analysisGenerated
         ? `已生成（含 ${newsCount} 条精选新闻）`
         : "未生成（缺少 API Key 或生成失败）",
