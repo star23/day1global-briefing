@@ -20,6 +20,7 @@ async function fetchOKXTicker(
   try {
     const url = `https://www.okx.com/api/v5/market/ticker?instId=${instId}`;
     const res = await fetch(url, {
+      cache: 'no-store',
       headers: { Accept: "application/json" },
     });
 

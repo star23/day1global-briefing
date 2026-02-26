@@ -35,6 +35,7 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
 
   try {
     const res = await fetch(`${COINGLASS_BASE}/api/index/fear-greed-history`, {
+      cache: 'no-store',
       headers: { "CG-API-KEY": apiKey, accept: "application/json" },
     });
 
