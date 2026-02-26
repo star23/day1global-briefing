@@ -83,7 +83,6 @@ function formatTimestamp(ts: string): string {
 // ---- 标签页定义 ----
 const TABS = [
   { id: "overview", label: "总览" },
-  { id: "liquidity", label: "流动性" },
   { id: "sentiment", label: "市场情绪" },
   { id: "btc-bottom", label: "BTC底部" },
   { id: "portfolio", label: "持仓" },
@@ -417,7 +416,6 @@ export default function MorningBriefing() {
         ) : (
           <>
             {activeTab === "overview" && <OverviewTab data={data} analysis={analysis} />}
-            {activeTab === "liquidity" && <LiquidityTab analysis={analysis} />}
             {activeTab === "sentiment" && <SentimentTab data={data} analysis={analysis} />}
             {activeTab === "btc-bottom" && <BTCBottomTab data={data} analysis={analysis} />}
             {activeTab === "portfolio" && <PortfolioTab data={data} />}
@@ -428,7 +426,7 @@ export default function MorningBriefing() {
 
       {/* Footer */}
       <footer style={{ textAlign: "center", padding: "24px 16px", color: "#64748b", fontSize: 12 }}>
-        <a href="https://day1global.xyz/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Day1 Global</a> Briefing — 数据来源: Finnhub, OKX, Alternative.me, CoinGlass, Claude AI
+        <a href="https://day1global.xyz/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Day1 Global</a> Briefing — 数据来源: Finnhub, Yahoo Finance, OKX, CoinGlass, Claude AI
       </footer>
     </div>
   );
@@ -597,93 +595,6 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
   );
 }
 
-// ========== 流动性标签页 ==========
-function LiquidityTab({ analysis }: { analysis?: AIAnalysis | null }) {
-  const liquidityIndicators = [
-    { name: "美联储净流动性", val: "关注缩表持续影响", signal: "ON RRP缓冲逐步耗尽", badge: "🟡 关注", color: COLORS.yellow },
-    { name: "SOFR利率", val: "联邦基金利率区间内", signal: "在正常范围内波动", badge: "✅ 正常", color: COLORS.green },
-    { name: "MOVE指数", val: "美债波动率", signal: "关注是否突破130危险线", badge: "🟡 关注", color: COLORS.yellow },
-    { name: "USDJPY/美日利差", val: "关注套利交易平仓风险", signal: "日元套利暂稳", badge: "✅ 正常", color: COLORS.green },
-  ];
-
-  return (
-    <>
-      <Card title="💧 宏观流动性监控报告" icon="" accent={COLORS.accent}>
-        <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12 }}>
-          流动性 = 市场里有多少钱在流动。钱多→资产涨；钱少→资产承压
-        </div>
-
-        {/* AI 分析覆盖 */}
-        {analysis?.macroAnalysis && (
-          <div style={{ marginBottom: 16, padding: 12, background: COLORS.dimBg, borderRadius: 8, border: `1px solid ${COLORS.purple}30` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Badge color={COLORS.purple}>AI 分析</Badge>
-              {analysis.generatedAt && (
-                <span style={{ fontSize: 11, color: "#64748b" }}>{formatTimestamp(analysis.generatedAt)}</span>
-              )}
-            </div>
-            <div style={{ fontSize: 13, color: COLORS.muted, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
-              {analysis.macroAnalysis}
-            </div>
-          </div>
-        )}
-
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
-              {["指标", "当前状态", "信号", "评级"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {liquidityIndicators.map((r) => (
-              <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
-                <td style={{ padding: "10px 6px", fontWeight: 600, color: COLORS.text }}>{r.name}</td>
-                <td style={{ padding: "10px 6px", color: COLORS.muted, fontSize: 12 }}>{r.val}</td>
-                <td style={{ padding: "10px 6px", color: COLORS.muted, fontSize: 12 }}>{r.signal}</td>
-                <td style={{ padding: "10px 6px" }}><Badge color={r.color}>{r.badge}</Badge></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
-      <Card title="净流动性构成解析" icon="📊" accent={COLORS.accent}>
-        <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>美联储总资产（水池总量）</span><span style={{ color: COLORS.text, fontWeight: 700 }}>缩表持续中 ↓</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>— TGA余额（政府蓄水池）</span><span style={{ color: COLORS.yellow, fontWeight: 700 }}>关注偏高吸收流动性</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>— ON RRP余额（美联储停车场）</span><span style={{ color: COLORS.green, fontWeight: 700 }}>已大幅下降 ↓</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8, marginTop: 8 }}>
-            <span style={{ fontWeight: 700 }}>= 净流动性</span><span style={{ color: COLORS.yellow, fontWeight: 800 }}>缓慢收紧中</span>
-          </div>
-        </div>
-        <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 12, marginTop: 12, fontSize: 12, color: COLORS.muted }}>
-          <strong style={{ color: COLORS.yellow }}>⚠️ 关键风险：</strong>ON RRP这个&quot;缓冲垫&quot;已接近用尽。过去两年缩表的痛苦被ON RRP的下降所吸收，现在缓冲减少，未来缩表将更直接影响市场流动性。如果TGA同时上升（财政部发债），流动性将加速收紧。
-        </div>
-      </Card>
-
-      <Card title="综合评级与建议" icon="🚦" accent={COLORS.yellow}>
-        <div style={{ textAlign: "center", margin: "8px 0" }}>
-          <div style={{ fontSize: 28, fontWeight: 900, color: COLORS.yellow }}>🟡 流动性偏紧</div>
-          <div style={{ fontSize: 13, color: COLORS.muted }}>关注ON RRP与TGA余额变化</div>
-        </div>
-        <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.8, marginTop: 12 }}>
-          <div>• <strong style={{ color: COLORS.text }}>美股：</strong>维持正常仓位，密切关注债券市场波动（MOVE指数）</div>
-          <div>• <strong style={{ color: COLORS.text }}>加密：</strong>流动性环境不支持大规模加仓，保持谨慎</div>
-          <div>• <strong style={{ color: COLORS.text }}>前瞻：</strong>关注FOMC会议对缩表节奏的指引；财政部再融资公告（影响TGA）</div>
-        </div>
-      </Card>
-    </>
-  );
-}
-
 // ========== 市场情绪标签页 ==========
 function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
@@ -704,8 +615,6 @@ function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?
     { name: "CNN恐惧贪婪指数", val: cnnFG !== null && cnnFG !== undefined ? `${cnnFG}/100` : "获取中...", signal: cnnLabel ? `${cnnLabel}` : "美股市场情绪指标", badge: cnnBadge, color: cnnColor },
     { name: "VIX恐慌指数", val: formatPrice(vixPrice), signal: vixPrice > 30 ? "恐慌区间" : vixPrice > 20 ? "偏高但未恐慌" : "正常区间", badge: vixPrice > 30 ? "🔴 恐慌" : vixPrice > 20 ? "⚠️ 关注" : "✅ 正常", color: vixPrice > 30 ? COLORS.red : vixPrice > 20 ? COLORS.yellow : COLORS.green },
     { name: "加密恐惧贪婪", val: `${fearGreed}/100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : fearGreed <= 45 ? "恐惧" : "中性偏上", badge: fearGreed <= 25 ? "🔴 极端" : fearGreed <= 45 ? "⚠️ 恐惧" : "✅ 正常", color: fearGreed <= 25 ? COLORS.red : fearGreed <= 45 ? COLORS.yellow : COLORS.green },
-    { name: "S&P 500远期PE", val: "~22-23x", signal: "接近历史高位区间", badge: "⚠️ 关注", color: COLORS.yellow },
-    { name: "对冲基金杠杆", val: "偏高水平", signal: "高杠杆=波动放大器", badge: "⚠️ 关注", color: COLORS.yellow },
   ];
 
   return (
@@ -890,7 +799,6 @@ function BTCBottomTab({ data, analysis }: { data?: MarketDataResponse; analysis?
     { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor },
     { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted },
     { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor },
-    { name: "矿机关机价", val: "~$55-60K参考", signal: "接近中效矿机成本线时关注", badge: "📊 参考", color: COLORS.muted },
   ];
 
   const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发") || i.badge.includes("强底") || i.badge.includes("历史底") || i.badge.includes("抄底") || i.badge.includes("底部")).length;
