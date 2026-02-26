@@ -106,7 +106,7 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   // 情绪指标
   lines.push("");
   lines.push(`🎯 <b>市场情绪</b>`);
-  lines.push(`  加密恐慌贪婪: ${data.sentiment.cryptoFearGreed}/100 (${data.sentiment.cryptoFearGreedLabel})`);
+  lines.push(`  加密恐慌贪婪: ${data.sentiment.cryptoFearGreed}/100 (${data.sentiment.cryptoFearGreedLabel})${data.sentiment.cryptoFearGreedChange !== null ? ` [${data.sentiment.cryptoFearGreedChange > 0 ? "+" : ""}${data.sentiment.cryptoFearGreedChange}, 昨日${data.sentiment.cryptoFearGreedPrev}]` : ""}`);
   if (data.sentiment.cnnFearGreed !== null) {
     lines.push(`  CNN恐惧贪婪: ${data.sentiment.cnnFearGreed}/100 (${data.sentiment.cnnFearGreedLabel})`);
   }

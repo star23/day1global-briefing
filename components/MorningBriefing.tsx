@@ -459,6 +459,8 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
   // 恐慌贪婪数值
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
   const fearGreedLabel = data?.sentiment?.cryptoFearGreedLabel ?? "中性";
+  const fearGreedPrev = data?.sentiment?.cryptoFearGreedPrev;
+  const fearGreedChange = data?.sentiment?.cryptoFearGreedChange;
 
   // 流动性评级 (基于VIX)
   const vixPrice = data?.indices?.vix?.price ?? 20;
@@ -504,6 +506,16 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
             <div style={{ fontSize: 28, fontWeight: 900, color: getFearGreedColor(fearGreed) }}>{sentimentRating}</div>
             <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
               加密恐慌贪婪: {fearGreed} ({fearGreedLabel})
+              {fearGreedChange !== null && fearGreedChange !== undefined && (
+                <span style={{ color: fearGreedChange > 0 ? COLORS.green : fearGreedChange < 0 ? COLORS.red : COLORS.muted, marginLeft: 4 }}>
+                  {fearGreedChange > 0 ? "+" : ""}{fearGreedChange}
+                </span>
+              )}
+              {fearGreedPrev !== null && fearGreedPrev !== undefined && (
+                <span style={{ color: COLORS.muted, marginLeft: 4 }}>
+                  (昨日 {fearGreedPrev})
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 8, textAlign: "left" }}>
               {fearGreed <= 25
@@ -598,6 +610,8 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
 // ========== 市场情绪标签页 ==========
 function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?: AIAnalysis | null }) {
   const fearGreed = data?.sentiment?.cryptoFearGreed ?? 50;
+  const fearGreedPrev = data?.sentiment?.cryptoFearGreedPrev;
+  const fearGreedChange = data?.sentiment?.cryptoFearGreedChange;
   const cnnFG = data?.sentiment?.cnnFearGreed;
   const cnnLabel = data?.sentiment?.cnnFearGreedLabel;
   const vixPrice = data?.indices?.vix?.price ?? 20;
@@ -614,7 +628,7 @@ function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?
   const sentimentIndicators = [
     { name: "CNN恐惧贪婪指数", val: cnnFG !== null && cnnFG !== undefined ? `${cnnFG}/100` : "获取中...", signal: cnnLabel ? `${cnnLabel}` : "美股市场情绪指标", badge: cnnBadge, color: cnnColor },
     { name: "VIX恐慌指数", val: formatPrice(vixPrice), signal: vixPrice > 30 ? "恐慌区间" : vixPrice > 20 ? "偏高但未恐慌" : "正常区间", badge: vixPrice > 30 ? "🔴 恐慌" : vixPrice > 20 ? "⚠️ 关注" : "✅ 正常", color: vixPrice > 30 ? COLORS.red : vixPrice > 20 ? COLORS.yellow : COLORS.green },
-    { name: "加密恐惧贪婪", val: `${fearGreed}/100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : fearGreed <= 45 ? "恐惧" : "中性偏上", badge: fearGreed <= 25 ? "🔴 极端" : fearGreed <= 45 ? "⚠️ 恐惧" : "✅ 正常", color: fearGreed <= 25 ? COLORS.red : fearGreed <= 45 ? COLORS.yellow : COLORS.green },
+    { name: "加密恐惧贪婪", val: `${fearGreed}/100${fearGreedChange !== null && fearGreedChange !== undefined ? ` (${fearGreedChange > 0 ? "+" : ""}${fearGreedChange})` : ""}`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : fearGreed <= 45 ? "恐惧" : "中性偏上", badge: fearGreed <= 25 ? "🔴 极端" : fearGreed <= 45 ? "⚠️ 恐惧" : "✅ 正常", color: fearGreed <= 25 ? COLORS.red : fearGreed <= 45 ? COLORS.yellow : COLORS.green },
   ];
 
   return (
@@ -657,6 +671,16 @@ function SentimentTab({ data, analysis }: { data?: MarketDataResponse; analysis?
           <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14 }}>
             <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 6 }}>加密情绪</div>
             <Gauge value={fearGreed} max={100} label={`Crypto Fear & Greed (${fearGreed})`} color={getFearGreedColor(fearGreed)} />
+            {fearGreedPrev !== null && fearGreedPrev !== undefined && (
+              <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>
+                昨日: {fearGreedPrev}
+                {fearGreedChange !== null && fearGreedChange !== undefined && (
+                  <span style={{ color: fearGreedChange > 0 ? COLORS.green : fearGreedChange < 0 ? COLORS.red : COLORS.muted, marginLeft: 4, fontWeight: 600 }}>
+                    {fearGreedChange > 0 ? "+" : ""}{fearGreedChange}
+                  </span>
+                )}
+              </div>
+            )}
             <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 6 }}>
               {fearGreed <= 10
                 ? "历史性极度恐慌！过去仅2018/2022触及此水平。杠杆多头被清洗。"
@@ -1101,10 +1125,20 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
             <div style={{ fontSize: 10, color: COLORS.muted }}>加密恐慌贪婪指数</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: getFearGreedColor(data.sentiment.cryptoFearGreed) }}>
               {data.sentiment.cryptoFearGreed}
+              {data.sentiment.cryptoFearGreedChange !== null && data.sentiment.cryptoFearGreedChange !== undefined && (
+                <span style={{ fontSize: 13, marginLeft: 6, color: data.sentiment.cryptoFearGreedChange > 0 ? COLORS.green : data.sentiment.cryptoFearGreedChange < 0 ? COLORS.red : COLORS.muted }}>
+                  {data.sentiment.cryptoFearGreedChange > 0 ? "+" : ""}{data.sentiment.cryptoFearGreedChange}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 11, color: getFearGreedColor(data.sentiment.cryptoFearGreed), fontWeight: 600 }}>
               {data.sentiment.cryptoFearGreedLabel}
             </div>
+            {data.sentiment.cryptoFearGreedPrev !== null && data.sentiment.cryptoFearGreedPrev !== undefined && (
+              <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 2 }}>
+                昨日: {data.sentiment.cryptoFearGreedPrev}
+              </div>
+            )}
           </div>
         )}
       </Card>
