@@ -1,9 +1,6 @@
 // ========== 获取加密恐慌贪婪指数 ==========
 // 使用 CoinGlass API（与 BTC 链上指标同一 API Key，数据更及时）
-//
-// API 响应格式:
-// { code: "0", data: [{ values: [number...], price: [number...], time_list: [number...] }] }
-// values 数组最后一个元素为最新的恐慌贪婪指数 (0-100)
+// 兼容多种响应格式（并行数组 / 独立记录数组 / 单对象）
 
 import { SentimentData } from "./types";
 
@@ -41,18 +38,35 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
       return defaultData;
     }
 
-    // data[0] 包含 values/price/time_list 三个平行数组
-    const record = Array.isArray(json.data) && json.data.length > 0 ? json.data[0] : null;
-    if (!record || !Array.isArray(record.values) || record.values.length === 0) {
-      console.error("[CoinGlass] 恐慌贪婪指数数据为空");
+    // CoinGlass 可能返回两种格式:
+    //   格式A (并行数组): { data: [{ values: [32, 23, ...], price: [...] }] }
+    //   格式B (独立记录): { data: [{ value: 32, price: 47886 }, ...] }
+    //   格式C (对象):     { data: { value: 32, ... } }
+    let value: number | undefined;
+
+    if (Array.isArray(json.data) && json.data.length > 0) {
+      const first = json.data[0];
+      if (Array.isArray(first.values) && first.values.length > 0) {
+        // 格式A: 并行数组，取最后一个元素
+        value = Number(first.values[first.values.length - 1]);
+        console.log(`[CoinGlass] Fear&Greed 格式A: values数组长度=${first.values.length}, 最新值=${value}`);
+      } else {
+        // 格式B: 独立记录数组，取最后一条的 value 字段
+        const last = json.data[json.data.length - 1];
+        value = Number(last.value ?? last.values ?? last.fear_greed ?? last.fearGreed);
+        console.log(`[CoinGlass] Fear&Greed 格式B: 记录数=${json.data.length}, 最后一条keys=[${Object.keys(last).join(",")}], 值=${value}`);
+      }
+    } else if (typeof json.data === "object" && json.data !== null) {
+      // 格式C: 直接对象
+      value = Number(json.data.value ?? json.data.values ?? json.data.fear_greed ?? json.data.fearGreed);
+      console.log(`[CoinGlass] Fear&Greed 格式C: keys=[${Object.keys(json.data).join(",")}], 值=${value}`);
+    } else {
+      console.error("[CoinGlass] 恐慌贪婪指数数据格式未知:", typeof json.data);
       return defaultData;
     }
 
-    // 取 values 数组最后一个元素（最新值）
-    const value = Number(record.values[record.values.length - 1]);
-
-    if (isNaN(value)) {
-      console.error("[CoinGlass] 恐慌贪婪指数解析失败, 最后一条:", record.values.slice(-3));
+    if (value === undefined || isNaN(value)) {
+      console.error("[CoinGlass] 恐慌贪婪指数解析失败, raw data sample:", JSON.stringify(json.data).slice(0, 300));
       return defaultData;
     }
 
