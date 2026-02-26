@@ -1,5 +1,9 @@
 // ========== 获取加密恐慌贪婪指数 ==========
 // 使用 CoinGlass API（与 BTC 链上指标同一 API Key，数据更及时）
+//
+// API 响应格式:
+// { code: "0", data: [{ values: [number...], price: [number...], time_list: [number...] }] }
+// values 数组最后一个元素为最新的恐慌贪婪指数 (0-100)
 
 import { SentimentData } from "./types";
 
@@ -37,18 +41,18 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
       return defaultData;
     }
 
-    // data 是时间序列数组，取最新一条
-    const records = Array.isArray(json.data) ? json.data : [];
-    if (records.length === 0) {
+    // data[0] 包含 values/price/time_list 三个平行数组
+    const record = Array.isArray(json.data) && json.data.length > 0 ? json.data[0] : null;
+    if (!record || !Array.isArray(record.values) || record.values.length === 0) {
       console.error("[CoinGlass] 恐慌贪婪指数数据为空");
       return defaultData;
     }
 
-    const latest = records[records.length - 1];
-    const value = Number(latest.value ?? latest.score ?? latest.fear_greed);
+    // 取 values 数组最后一个元素（最新值）
+    const value = Number(record.values[record.values.length - 1]);
 
     if (isNaN(value)) {
-      console.error("[CoinGlass] 恐慌贪婪指数解析失败:", latest);
+      console.error("[CoinGlass] 恐慌贪婪指数解析失败, 最后一条:", record.values.slice(-3));
       return defaultData;
     }
 
@@ -61,14 +65,11 @@ export async function fetchFearGreedIndex(): Promise<SentimentData> {
       value <= 75 ? "Greed" :
       "Extreme Greed";
 
-    // 优先使用 API 返回的标签
-    const classification = latest.value_classification ?? latest.classification ?? label;
-
-    console.log(`[CoinGlass] 恐慌贪婪指数 = ${value} (${classification})`);
+    console.log(`[CoinGlass] 恐慌贪婪指数 = ${value} (${label})`);
 
     return {
       cryptoFearGreed: Math.round(value),
-      cryptoFearGreedLabel: classification,
+      cryptoFearGreedLabel: label,
       cnnFearGreed: null,
       cnnFearGreedLabel: null,
     };
