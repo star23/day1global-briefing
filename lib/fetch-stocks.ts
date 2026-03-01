@@ -120,14 +120,16 @@ async function fetchYahooSymbol(
   }
 }
 
-/** 获取指数数据（VIX 和黄金） */
+/** 获取指数数据（VIX、黄金、原油） */
 export async function fetchIndices(): Promise<{
   vix: IndexData | null;
   gold: IndexData | null;
+  crudeOil: IndexData | null;
 }> {
-  const [vixData, goldData] = await Promise.all([
+  const [vixData, goldData, oilData] = await Promise.all([
     fetchYahooSymbol("^VIX"),
     fetchYahooSymbol("GC=F"),
+    fetchYahooSymbol("CL=F"),
   ]);
 
   return {
@@ -136,6 +138,9 @@ export async function fetchIndices(): Promise<{
       : null,
     gold: goldData
       ? { price: goldData.price, changePercent: goldData.changePercent }
+      : null,
+    crudeOil: oilData
+      ? { price: oilData.price, changePercent: oilData.changePercent }
       : null,
   };
 }
