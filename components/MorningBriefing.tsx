@@ -461,6 +461,9 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
   if (data?.indices?.gold) {
     indices.push({ name: "Gold", val: `$${formatPrice(data.indices.gold.price)}`, chg: formatChange(data.indices.gold.changePercent), color: getChangeColor(data.indices.gold.changePercent) });
   }
+  if (data?.indices?.crudeOil) {
+    indices.push({ name: "Crude Oil", val: `$${formatPrice(data.indices.crudeOil.price)}`, chg: formatChange(data.indices.crudeOil.changePercent), color: getChangeColor(data.indices.crudeOil.changePercent) });
+  }
   if (data?.crypto?.BTC) {
     indices.push({ name: "BTC", val: `$${formatPrice(data.crypto.BTC.price, true)}`, chg: formatChange(data.crypto.BTC.change24h), color: getChangeColor(data.crypto.BTC.change24h) });
   }
@@ -615,6 +618,36 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
           </div>
         )}
       </Card>
+
+      {/* 地缘政治专题 */}
+      {analysis && (analysis.iranCeasefire || analysis.hormuzStrait) && (
+        <Card title="地缘政治专题" icon="🌍" accent={COLORS.red}>
+          <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
+            {analysis.iranCeasefire && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Badge color={COLORS.red}>伊朗停火</Badge>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>美国-伊朗战争停火进展</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.iranCeasefire}</div>
+              </div>
+            )}
+            {analysis.hormuzStrait && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Badge color={COLORS.orange}>海峡风险</Badge>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>霍尔木兹海峡封锁风险</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.hormuzStrait}</div>
+              </div>
+            )}
+            <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
+              <Badge color={COLORS.purple}>AI 生成</Badge>
+              <span style={{ marginLeft: 6 }}>数据来源: OpenNews, OpenTwitter, Finnhub</span>
+            </div>
+          </div>
+        </Card>
+      )}
     </>
   );
 }
@@ -1247,6 +1280,17 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
               </div>
               <div style={{ fontSize: 11, color: getChangeColor(data.indices.gold.changePercent), fontWeight: 600 }}>
                 {formatChange(data.indices.gold.changePercent)}
+              </div>
+            </div>
+          )}
+          {data?.indices?.crudeOil && (
+            <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14, textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: COLORS.muted }}>原油 (CL=F)</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: COLORS.text }}>
+                ${formatPrice(data.indices.crudeOil.price)}
+              </div>
+              <div style={{ fontSize: 11, color: getChangeColor(data.indices.crudeOil.changePercent), fontWeight: 600 }}>
+                {formatChange(data.indices.crudeOil.changePercent)}
               </div>
             </div>
           )}

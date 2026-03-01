@@ -94,6 +94,9 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   if (data.indices.gold.price) {
     lines.push(`  Gold: $${fmtPrice(data.indices.gold.price)} ${fmtChange(data.indices.gold.changePercent)}`);
   }
+  if (data.indices.crudeOil?.price) {
+    lines.push(`  Crude Oil: $${fmtPrice(data.indices.crudeOil.price)} ${fmtChange(data.indices.crudeOil.changePercent)}`);
+  }
 
   // 加密
   if (data.crypto.BTC) {
@@ -128,6 +131,18 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   lines.push("");
   lines.push(`💼 <b>操作建议</b>`);
   lines.push(analysis.actionSuggestions);
+
+  // ---- 地缘政治专题 ----
+  if (analysis.iranCeasefire) {
+    lines.push("");
+    lines.push(`🌍 <b>伊朗停火进展</b>`);
+    lines.push(analysis.iranCeasefire);
+  }
+  if (analysis.hormuzStrait) {
+    lines.push("");
+    lines.push(`⛽ <b>霍尔木兹海峡</b>`);
+    lines.push(analysis.hormuzStrait);
+  }
 
   // ---- 持仓快览 ----
   const stockTickers = Object.keys(data.stocks);

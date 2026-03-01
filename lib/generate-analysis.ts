@@ -5,6 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MarketDataResponse, AIAnalysis, NewsItem } from "./types";
 import { RawNewsItem } from "./fetch-news";
+import { GeopoliticalNews, formatGeopoliticalNewsForPrompt } from "./fetch-geopolitical-news";
 
 // 创建 Anthropic 客户端（使用环境变量 ANTHROPIC_API_KEY）
 const anthropic = new Anthropic();
@@ -34,6 +35,7 @@ ${cryptoLines || "  暂无数据"}
 【指数与商品】
   VIX 恐慌指数: ${data.indices.vix.price.toFixed(2)} (${data.indices.vix.changePercent >= 0 ? "+" : ""}${data.indices.vix.changePercent.toFixed(2)}%)
   黄金 (GC=F): $${data.indices.gold.price.toFixed(2)} (${data.indices.gold.changePercent >= 0 ? "+" : ""}${data.indices.gold.changePercent.toFixed(2)}%)
+  原油 (CL=F): $${data.indices.crudeOil.price.toFixed(2)} (${data.indices.crudeOil.changePercent >= 0 ? "+" : ""}${data.indices.crudeOil.changePercent.toFixed(2)}%)
 
 【市场情绪】
   加密恐慌贪婪指数: ${data.sentiment.cryptoFearGreed}/100 (${data.sentiment.cryptoFearGreedLabel})${data.sentiment.cryptoFearGreedPrev !== null ? ` [昨日: ${data.sentiment.cryptoFearGreedPrev}, 变化: ${data.sentiment.cryptoFearGreedChange !== null && data.sentiment.cryptoFearGreedChange > 0 ? "+" : ""}${data.sentiment.cryptoFearGreedChange}]` : ""}${data.sentiment.cnnFearGreed !== null ? `\n  CNN恐惧贪婪指数(美股): ${data.sentiment.cnnFearGreed}/100 (${data.sentiment.cnnFearGreedLabel})` : ""}${data.btcMetrics?.weeklyRsi !== null ? `\n\n【BTC技术指标】\n  周线RSI: ${data.btcMetrics.weeklyRsi}` : ""}${data.btcMetrics?.volume24h !== null ? `\n  24h成交量: $${(data.btcMetrics.volume24h! / 1e9).toFixed(1)}B (${data.btcMetrics.volumeChangePercent !== null ? `${data.btcMetrics.volumeChangePercent > 0 ? "+" : ""}${data.btcMetrics.volumeChangePercent.toFixed(0)}% vs 30日均值` : "N/A"})` : ""}${data.btcMetrics?.sthSopr !== null ? `\n  STH-SOPR(短期持有者利润率): ${data.btcMetrics.sthSopr}` : ""}${data.btcMetrics?.lthSopr !== null ? `\n  LTH-SOPR(长期持有者利润率): ${data.btcMetrics.lthSopr}` : ""}${data.btcMetrics?.wma200Price !== null ? `\n  200周均线: $${data.btcMetrics.wma200Price!.toLocaleString()}${data.btcMetrics.wma200Multiplier !== null ? ` (当前价格/200WMA = ${data.btcMetrics.wma200Multiplier}x)` : ""}` : ""}
@@ -60,28 +62,36 @@ function formatNewsForPrompt(news: RawNewsItem[]): string {
 /** 调用 Claude API 生成市场分析 */
 export async function generateMarketAnalysis(
   data: MarketDataResponse,
-  rawNews: RawNewsItem[] = []
+  rawNews: RawNewsItem[] = [],
+  geoNews: GeopoliticalNews = { iranCeasefire: [], hormuzStrait: [] }
 ): Promise<AIAnalysis> {
   const marketSummary = formatMarketDataForPrompt(data);
   const newsSummary = formatNewsForPrompt(rawNews);
+  const geoNewsSummary = formatGeopoliticalNewsForPrompt(geoNews);
 
   // 构建 Prompt
   const prompt = `你是一位专业的全球市场分析师，为中文投资者提供每日投资情报早报。
 
 以下是今日最新的市场数据：
 
-${marketSummary}${newsSummary}
+${marketSummary}${newsSummary}${geoNewsSummary}
 
 请根据以上数据和新闻，生成今日市场分析报告。报告必须使用以下格式，每个部分用分隔符标记：
 
 ===宏观判断===
-（分析全球宏观环境：美股大盘走势、VIX波动率水平含义、黄金价格趋势、美元/利率环境对市场的影响。2-4段，每段2-3句话。重点关注数据背后的逻辑和市场信号。）
+（分析全球宏观环境：美股大盘走势、VIX波动率水平含义、黄金与原油价格趋势、美元/利率环境对市场的影响。2-4段，每段2-3句话。重点关注数据背后的逻辑和市场信号。）
 
 ===加密分析===
 （分析加密货币市场：BTC价格走势和关键位、ETH及其他代币表现、恐慌贪婪指数解读、加密市场与传统市场的联动性。2-4段，每段2-3句话。）
 
 ===操作建议===
 （基于以上分析给出具体的操作思路：仓位管理建议、需要关注的风险点、潜在机会。使用要点列表格式，3-5条。注意：必须声明不构成投资建议。）
+
+===伊朗停火===
+（基于主题A的新闻和推文，分析美国与伊朗战争/冲突的最新停火进展。包括：双方的最新表态和行动、停火谈判进展、国际社会的调停努力、对全球市场（尤其是原油和避险资产）的潜在影响。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
+
+===霍尔木兹海峡===
+（基于主题B的新闻和推文，分析伊朗是否会封锁霍尔木兹海峡。包括：伊朗的最新军事动态和官方声明、海峡通航的实际状况、对全球原油供应和油价的影响评估、各方的应对措施。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
 
 ===今日必看===
 从以上新闻中精选10条对投资者最重要的新闻（如果新闻不足10条则有多少选多少），输出一个合法的JSON数组。每条包含：
@@ -100,11 +110,12 @@ ${marketSummary}${newsSummary}
 - 分析要基于实际数据，不要泛泛而谈
 - 语气专业但通俗易懂（读者可能是非专业投资者）
 - 宏观判断、加密分析、操作建议每个部分控制在 200 字以内
+- 伊朗停火、霍尔木兹海峡每个部分控制在 300 字以内
 - 今日必看的JSON必须是合法的JSON数组，可以直接被 JSON.parse 解析`;
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4000,
+    max_tokens: 6000,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -114,10 +125,12 @@ ${marketSummary}${newsSummary}
     .map((block) => block.text)
     .join("");
 
-  // 解析三个文本部分（通过分隔符切割）
+  // 解析文本部分（通过分隔符切割）
   const macroAnalysis = extractSection(responseText, "宏观判断");
   const cryptoAnalysis = extractSection(responseText, "加密分析");
   const actionSuggestions = extractSection(responseText, "操作建议");
+  const iranCeasefire = extractSection(responseText, "伊朗停火");
+  const hormuzStrait = extractSection(responseText, "霍尔木兹海峡");
 
   // 解析新闻 JSON
   const topNews = extractNewsJSON(responseText);
@@ -127,6 +140,8 @@ ${marketSummary}${newsSummary}
     cryptoAnalysis,
     actionSuggestions,
     topNews,
+    iranCeasefire,
+    hormuzStrait,
     generatedAt: new Date().toISOString(),
     dataTimestamp: data.timestamp,
   };

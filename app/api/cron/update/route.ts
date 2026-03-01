@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { generateMarketAnalysis } from "@/lib/generate-analysis";
 import { fetchNews } from "@/lib/fetch-news";
+import { fetchGeopoliticalNews } from "@/lib/fetch-geopolitical-news";
 import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
 import { ensureTable, upsertDailyMetrics } from "@/lib/db";
@@ -70,9 +71,13 @@ export async function GET(request: NextRequest) {
       console.error("[Cron] 写入 Postgres 失败:", dbErr);
     }
 
-    // ---- 第二步：获取最新新闻 ----
-    const rawNews = await fetchNews();
+    // ---- 第二步：获取最新新闻 + 地缘政治新闻 ----
+    const [rawNews, geoNews] = await Promise.all([
+      fetchNews(),
+      fetchGeopoliticalNews(),
+    ]);
     console.log(`[Cron] 新闻获取完成: ${rawNews.length} 条`);
+    console.log(`[Cron] 地缘新闻获取完成: 停火 ${geoNews.iranCeasefire.length} 条, 海峡 ${geoNews.hormuzStrait.length} 条`);
 
     // ---- 第三步：调用 Claude AI 生成分析 ----
     let analysisGenerated = false;
@@ -83,7 +88,7 @@ export async function GET(request: NextRequest) {
     if (process.env.ANTHROPIC_API_KEY) {
       try {
         console.log("[Cron] 正在调用 Claude AI 生成市场分析...");
-        const analysis = await generateMarketAnalysis(data, rawNews);
+        const analysis = await generateMarketAnalysis(data, rawNews, geoNews);
         newsCount = analysis.topNews.length;
 
         // ---- 第四步：存入 Upstash Redis ----
