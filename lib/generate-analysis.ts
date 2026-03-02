@@ -158,6 +158,23 @@ function extractSection(text: string, sectionName: string): string {
   return match ? match[1].trim() : `${sectionName}分析暂未生成`;
 }
 
+/** 清理 AI 生成的 JSON 字符串中的常见问题 */
+function sanitizeJsonString(raw: string): string {
+  // 1. 移除 JSON 前后可能存在的 markdown 代码块标记
+  let s = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+
+  // 2. 修复字符串值内部的未转义换行符（不影响 JSON 结构性换行）
+  //    遍历找到所有 "..." 字符串，替换其中的真实换行为 \\n
+  s = s.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
+    return match.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+  });
+
+  // 3. 移除尾部多余逗号（如 ,] 或 ,}）
+  s = s.replace(/,\s*([\]}])/g, "$1");
+
+  return s;
+}
+
 /** 从 AI 响应中提取今日必看新闻 JSON */
 function extractNewsJSON(text: string): NewsItem[] {
   try {
@@ -171,7 +188,35 @@ function extractNewsJSON(text: string): NewsItem[] {
       return [];
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    // 清理 JSON 字符串
+    const cleanJson = sanitizeJsonString(jsonMatch[0]);
+
+    let parsed: unknown[];
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch (firstErr) {
+      // 第二次尝试：逐个提取 JSON 对象
+      console.warn("[News] JSON 整体解析失败，尝试逐条提取:", (firstErr as Error).message);
+      const objMatches = cleanJson.match(/\{[^{}]*\}/g);
+      if (!objMatches || objMatches.length === 0) {
+        console.error("[News] 逐条提取也未找到新闻对象");
+        return [];
+      }
+      parsed = [];
+      for (const objStr of objMatches) {
+        try {
+          parsed.push(JSON.parse(objStr));
+        } catch {
+          // 跳过解析失败的单条
+        }
+      }
+      if (parsed.length === 0) {
+        console.error("[News] 所有单条新闻解析均失败");
+        return [];
+      }
+      console.log(`[News] 逐条提取成功恢复 ${parsed.length} 条新闻`);
+    }
+
     if (!Array.isArray(parsed)) {
       console.error("[News] 解析结果不是数组");
       return [];
@@ -180,18 +225,23 @@ function extractNewsJSON(text: string): NewsItem[] {
     // 验证并清洗每条新闻
     return parsed
       .filter(
-        (item: NewsItem) =>
-          item.title && item.url && item.source
+        (item: unknown) => {
+          const n = item as NewsItem;
+          return n.title && n.source;
+        }
       )
       .slice(0, 10)
-      .map((item: NewsItem) => ({
-        title: String(item.title),
-        tag: String(item.tag || "资讯"),
-        summary: String(item.summary || ""),
-        action: String(item.action || ""),
-        source: String(item.source),
-        url: String(item.url),
-      }));
+      .map((item: unknown) => {
+        const n = item as NewsItem;
+        return {
+          title: String(n.title),
+          tag: String(n.tag || "资讯"),
+          summary: String(n.summary || ""),
+          action: String(n.action || ""),
+          source: String(n.source),
+          url: String(n.url || ""),
+        };
+      });
   } catch (err) {
     console.error("[News] 解析新闻 JSON 失败:", err);
     return [];
