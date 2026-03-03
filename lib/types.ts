@@ -55,6 +55,7 @@ export interface MarketDataResponse {
     vix: IndexData;
     gold: IndexData;
     crudeOil: IndexData;
+    dxy: IndexData;
   };
   sentiment: SentimentData;
   btcMetrics: BTCMetrics;  // BTC 技术指标

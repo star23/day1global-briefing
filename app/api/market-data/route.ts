@@ -43,7 +43,7 @@ export async function GET() {
     }),
     fetchIndices().catch((err) => {
       console.error("获取指数数据失败:", err);
-      return { vix: null, gold: null, crudeOil: null };
+      return { vix: null, gold: null, crudeOil: null, dxy: null };
     }),
     fetchFearGreedIndex().catch((err) => {
       console.error("获取恐慌贪婪指数失败:", err);
@@ -68,6 +68,7 @@ export async function GET() {
       vix: indices.vix ?? { price: 0, changePercent: 0 },
       gold: indices.gold ?? { price: 0, changePercent: 0 },
       crudeOil: indices.crudeOil ?? { price: 0, changePercent: 0 },
+      dxy: indices.dxy ?? { price: 0, changePercent: 0 },
     },
     sentiment: {
       ...sentiment,

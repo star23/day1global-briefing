@@ -464,6 +464,9 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
   if (data?.indices?.crudeOil) {
     indices.push({ name: "Crude Oil", val: `$${formatPrice(data.indices.crudeOil.price)}`, chg: formatChange(data.indices.crudeOil.changePercent), color: getChangeColor(data.indices.crudeOil.changePercent) });
   }
+  if (data?.indices?.dxy) {
+    indices.push({ name: "DXY", val: formatPrice(data.indices.dxy.price), chg: formatChange(data.indices.dxy.changePercent), color: getChangeColor(data.indices.dxy.changePercent) });
+  }
   if (data?.crypto?.BTC) {
     indices.push({ name: "BTC", val: `$${formatPrice(data.crypto.BTC.price, true)}`, chg: formatChange(data.crypto.BTC.change24h), color: getChangeColor(data.crypto.BTC.change24h) });
   }
@@ -1291,6 +1294,17 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
               </div>
               <div style={{ fontSize: 11, color: getChangeColor(data.indices.crudeOil.changePercent), fontWeight: 600 }}>
                 {formatChange(data.indices.crudeOil.changePercent)}
+              </div>
+            </div>
+          )}
+          {data?.indices?.dxy && (
+            <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14, textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: COLORS.muted }}>美元指数 (DXY)</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: COLORS.text }}>
+                {formatPrice(data.indices.dxy.price)}
+              </div>
+              <div style={{ fontSize: 11, color: getChangeColor(data.indices.dxy.changePercent), fontWeight: 600 }}>
+                {formatChange(data.indices.dxy.changePercent)}
               </div>
             </div>
           )}
