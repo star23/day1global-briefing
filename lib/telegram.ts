@@ -97,6 +97,9 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   if (data.indices.crudeOil?.price) {
     lines.push(`  Crude Oil: $${fmtPrice(data.indices.crudeOil.price)} ${fmtChange(data.indices.crudeOil.changePercent)}`);
   }
+  if (data.indices.dxy?.price) {
+    lines.push(`  DXY: ${fmtPrice(data.indices.dxy.price)} ${fmtChange(data.indices.dxy.changePercent)}`);
+  }
 
   // 加密
   if (data.crypto.BTC) {
