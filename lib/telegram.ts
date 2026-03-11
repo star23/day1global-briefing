@@ -191,24 +191,63 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   return lines.join("\n");
 }
 
+/** 按 section 标记拆分消息为多段，每段不超过 4096 字符 */
+function splitMessage(message: string): string[] {
+  if (message.length <= 4096) return [message];
+
+  // 按已知的 section emoji 标记拆分
+  const sectionMarkers = [
+    "🧠 <b>AI 宏观判断</b>",
+    "₿ <b>AI 加密分析</b>",
+    "💼 <b>操作建议</b>",
+    "🌍 <b>伊朗停火进展</b>",
+    "⛽ <b>霍尔木兹海峡</b>",
+    "📈 <b>美股持仓</b>",
+    "₿ <b>加密持仓</b>",
+    "📰 <b>今日必看新闻</b>",
+    "📊 完整数据请访问",
+  ];
+
+  // 找到所有 section 的起始位置
+  const breakpoints: number[] = [0];
+  for (const marker of sectionMarkers) {
+    const idx = message.indexOf(marker);
+    if (idx > 0) breakpoints.push(idx);
+  }
+  breakpoints.sort((a, b) => a - b);
+
+  // 贪心合并 sections，使每段不超过 4096
+  const parts: string[] = [];
+  let current = "";
+  for (let i = 0; i < breakpoints.length; i++) {
+    const start = breakpoints[i];
+    const end = i + 1 < breakpoints.length ? breakpoints[i + 1] : message.length;
+    const segment = message.substring(start, end);
+
+    if (current.length + segment.length > 4096) {
+      if (current) parts.push(current.trim());
+      current = segment;
+    } else {
+      current += segment;
+    }
+  }
+  if (current) parts.push(current.trim());
+
+  // 安全检查：如果某段仍超 4096，强制截断
+  return parts.map((p) => (p.length > 4096 ? p.substring(0, 4090) + "\n..." : p));
+}
+
 /** 推送每日早报到 Telegram */
 export async function pushTelegramBriefing(data: MarketDataResponse, analysis: AIAnalysis): Promise<boolean> {
   const message = formatTelegramMessage(data, analysis);
+  const parts = splitMessage(message);
 
-  // Telegram 单条消息限制 4096 字符，超长则截断
-  if (message.length > 4096) {
-    // 分两条发送：市场数据 + AI 分析
-    const splitIndex = message.indexOf("🧠 <b>AI 宏观判断</b>");
-    if (splitIndex > 0) {
-      const part1 = message.substring(0, splitIndex).trim();
-      const part2 = message.substring(splitIndex).trim();
-      const ok1 = await sendTelegramMessage(part1);
-      const ok2 = await sendTelegramMessage(part2);
-      return ok1 && ok2;
-    }
-    // fallback: 截断
-    return sendTelegramMessage(message.substring(0, 4090) + "\n...");
+  console.log(`[Telegram] 消息总长 ${message.length} 字符，拆分为 ${parts.length} 段`);
+
+  let allOk = true;
+  for (const part of parts) {
+    const ok = await sendTelegramMessage(part);
+    if (!ok) allOk = false;
   }
-
-  return sendTelegramMessage(message);
+  return allOk;
 }
