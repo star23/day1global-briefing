@@ -86,7 +86,7 @@ export async function getRecentMetrics(limit: number = 30) {
  * - 一周前 (7 days ago)
  * - 一个月前 (30 days ago)
  *
- * 如果精确日期没有数据，取最近的一条 (±2天窗口)
+ * 对于每个目标日期，取该日期及之前最近的一条数据（不限窗口）
  */
 export async function getComparisonMetrics() {
   const { rows } = await sql`
@@ -96,14 +96,20 @@ export async function getComparisonMetrics() {
       SELECT '1w', (CURRENT_DATE - INTERVAL '7 days')::date
       UNION ALL
       SELECT '1m', (CURRENT_DATE - INTERVAL '30 days')::date
+    ),
+    ranked AS (
+      SELECT
+        t.label,
+        m.*,
+        ROW_NUMBER() OVER (PARTITION BY t.label ORDER BY m.date DESC) AS rn
+      FROM targets t
+      LEFT JOIN btc_metrics_daily m
+        ON m.date <= t.target
     )
-    SELECT DISTINCT ON (t.label)
-      t.label,
-      m.*
-    FROM targets t
-    LEFT JOIN btc_metrics_daily m
-      ON m.date BETWEEN (t.target - INTERVAL '2 days')::date AND (t.target + INTERVAL '2 days')::date
-    ORDER BY t.label, ABS(m.date - t.target) ASC
+    SELECT label, id, date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
+           sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed, created_at
+    FROM ranked
+    WHERE rn = 1
   `;
   return rows;
 }
