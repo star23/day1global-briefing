@@ -101,7 +101,7 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 - summary: 一句话中文说明（为什么重要）
 - action: 对投资者的操作建议（一句话）
 - source: 原文来源名称
-- url: 原文链接（必须使用新闻中提供的原始URL，不要修改）
+- url: 原文链接（必须使用新闻中提供的原始URL，不要修改。禁止使用 news.google.com 的链接，这类链接会 404。如果只有 Google News 链接，url 留空字符串即可。）
 
 格式示例：
 [{"title":"美联储暗示暂停加息","tag":"宏观","summary":"鲍威尔讲话释放鸽派信号，市场预期降息概率上升","action":"利好美股和加密，关注成长股反弹机会","source":"Reuters","url":"https://..."}]
@@ -234,13 +234,19 @@ function extractNewsJSON(text: string): NewsItem[] {
       .slice(0, 10)
       .map((item: unknown) => {
         const n = item as NewsItem;
+        let url = String(n.url || "");
+        // 过滤掉 news.google.com 链接（重定向 URL，经常 404）
+        if (url.includes("news.google.com")) {
+          console.warn(`[News] 过滤掉 Google News URL: ${url.slice(0, 80)}...`);
+          url = "";
+        }
         return {
           title: String(n.title),
           tag: String(n.tag || "资讯"),
           summary: String(n.summary || ""),
           action: String(n.action || ""),
           source: String(n.source),
-          url: String(n.url || ""),
+          url,
         };
       });
   } catch (err) {
