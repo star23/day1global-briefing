@@ -38,8 +38,9 @@ export async function fetchNews(): Promise<RawNewsItem[]> {
       ? await cryptoRes.json()
       : [];
 
-    // 合并并按时间倒序，取最近 30 条供 Claude 精选
+    // 合并、过滤 Google News URL、按时间倒序，取最近 30 条供 Claude 精选
     const combined = [...general, ...crypto]
+      .filter((n) => !n.url?.includes("news.google.com"))
       .sort((a, b) => b.datetime - a.datetime)
       .slice(0, 30);
 
