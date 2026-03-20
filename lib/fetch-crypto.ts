@@ -12,6 +12,8 @@ const CRYPTO_MAP: { [instId: string]: string } = {
   "HYPE-USDT": "HYPE",
   "VIRTUAL-USDT": "VIRTUAL",
   "TAO-USDT": "TAO",
+  "BNB-USDT": "BNB",
+  "SOL-USDT": "SOL",
 };
 
 /** 从 OKX 获取单个交易对的行情 */
