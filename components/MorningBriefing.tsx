@@ -652,6 +652,19 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
           </div>
         </Card>
       )}
+
+      {/* TAO/Bittensor 专题 */}
+      {analysis?.taoAnalysis && (
+        <Card title="TAO (Bittensor) 动态" icon="🤖" accent={COLORS.accent}>
+          <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
+            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.taoAnalysis}</div>
+            <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
+              <Badge color={COLORS.purple}>AI 生成</Badge>
+              <span style={{ marginLeft: 6 }}>数据来源: OpenNews, OpenTwitter</span>
+            </div>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

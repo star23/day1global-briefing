@@ -101,6 +101,7 @@ export interface AIAnalysis {
   topNews: NewsItem[];        // 今日必看 10 条新闻
   iranCeasefire: string;      // 美国-伊朗停火进展分析
   hormuzStrait: string;       // 霍尔木兹海峡封锁风险分析
+  taoAnalysis: string;        // Bittensor (TAO) 项目动态分析
   generatedAt: string;        // 生成时间（ISO 格式）
   dataTimestamp: string;      // 基于的市场数据时间戳
 }

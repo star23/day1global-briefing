@@ -91,14 +91,15 @@ async function searchTwitter(
 export interface GeopoliticalNews {
   iranCeasefire: GeoNewsItem[];
   hormuzStrait: GeoNewsItem[];
+  tao: GeoNewsItem[];
 }
 
-/** 获取地缘政治相关新闻（伊朗停火 + 霍尔木兹海峡） */
+/** 获取专题新闻（地缘政治 + 关注币种） */
 export async function fetchGeopoliticalNews(): Promise<GeopoliticalNews> {
   const token = process.env.NEWS_6551_TOKEN;
   if (!token) {
-    console.error("[Geopolitical] NEWS_6551_TOKEN 未设置，跳过地缘新闻获取");
-    return { iranCeasefire: [], hormuzStrait: [] };
+    console.error("[Geopolitical] NEWS_6551_TOKEN 未设置，跳过专题新闻获取");
+    return { iranCeasefire: [], hormuzStrait: [], tao: [] };
   }
 
   // 并发搜索所有主题（新闻 + 推文）
@@ -109,6 +110,9 @@ export async function fetchGeopoliticalNews(): Promise<GeopoliticalNews> {
     hormuzNewsEn,
     hormuzNewsCn,
     hormuzTweetsEn,
+    taoNewsEn,
+    taoNewsCn,
+    taoTweetsEn,
   ] = await Promise.all([
     searchNews(token, "Iran ceasefire war", 10),
     searchNews(token, "伊朗 停火", 5),
@@ -116,15 +120,21 @@ export async function fetchGeopoliticalNews(): Promise<GeopoliticalNews> {
     searchNews(token, "Hormuz strait blockade Iran", 10),
     searchNews(token, "霍尔木兹海峡 封锁", 5),
     searchTwitter(token, "Strait of Hormuz Iran blockade", 10),
+    searchNews(token, "Bittensor TAO", 10),
+    searchNews(token, "TAO Bittensor 去中心化AI", 5),
+    searchTwitter(token, "Bittensor TAO subnet", 10),
   ]);
 
+  const taoAll = [...taoNewsEn, ...taoNewsCn, ...taoTweetsEn];
+
   console.log(
-    `[Geopolitical] 新闻获取完成: 停火 ${ceaseNewsEn.length + ceaseNewsCn.length + ceaseTweetsEn.length} 条, 海峡 ${hormuzNewsEn.length + hormuzNewsCn.length + hormuzTweetsEn.length} 条`
+    `[Topics] 新闻获取完成: 停火 ${ceaseNewsEn.length + ceaseNewsCn.length + ceaseTweetsEn.length} 条, 海峡 ${hormuzNewsEn.length + hormuzNewsCn.length + hormuzTweetsEn.length} 条, TAO ${taoAll.length} 条`
   );
 
   return {
     iranCeasefire: [...ceaseNewsEn, ...ceaseNewsCn, ...ceaseTweetsEn],
     hormuzStrait: [...hormuzNewsEn, ...hormuzNewsCn, ...hormuzTweetsEn],
+    tao: taoAll,
   };
 }
 
@@ -150,6 +160,16 @@ export function formatGeopoliticalNewsForPrompt(geo: GeopoliticalNews): string {
       )
       .join("\n\n");
     sections.push(`【主题B：伊朗与霍尔木兹海峡相关新闻和推文（共${geo.hormuzStrait.length}条）】\n${items}`);
+  }
+
+  if (geo.tao.length > 0) {
+    const items = geo.tao
+      .map(
+        (n, i) =>
+          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
+      )
+      .join("\n\n");
+    sections.push(`【主题C：Bittensor (TAO) 相关新闻和推文（共${geo.tao.length}条）】\n${items}`);
   }
 
   return sections.length > 0 ? "\n\n" + sections.join("\n\n") : "";
