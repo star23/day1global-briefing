@@ -64,7 +64,7 @@ function formatNewsForPrompt(news: RawNewsItem[]): string {
 export async function generateMarketAnalysis(
   data: MarketDataResponse,
   rawNews: RawNewsItem[] = [],
-  geoNews: GeopoliticalNews = { iranCeasefire: [], hormuzStrait: [] }
+  geoNews: GeopoliticalNews = { iranCeasefire: [], hormuzStrait: [], tao: [] }
 ): Promise<AIAnalysis> {
   const marketSummary = formatMarketDataForPrompt(data);
   const newsSummary = formatNewsForPrompt(rawNews);
@@ -93,6 +93,9 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 
 ===霍尔木兹海峡===
 （基于主题B的新闻和推文，分析伊朗是否会封锁霍尔木兹海峡。包括：伊朗的最新军事动态和官方声明、海峡通航的实际状况、对全球原油供应和油价的影响评估、各方的应对措施。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
+
+===TAO动态===
+（基于主题C的新闻和推文，分析Bittensor (TAO) 项目的最新动态。包括：子网（subnet）生态发展、重大合作/集成、社区治理更新、代币经济变化、与其他AI项目的竞争格局。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
 
 ===今日必看===
 从以上新闻中精选10条对投资者最重要的新闻（如果新闻不足10条则有多少选多少），输出一个合法的JSON数组。每条包含：
@@ -132,6 +135,7 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
   const actionSuggestions = extractSection(responseText, "操作建议");
   const iranCeasefire = extractSection(responseText, "伊朗停火");
   const hormuzStrait = extractSection(responseText, "霍尔木兹海峡");
+  const taoAnalysis = extractSection(responseText, "TAO动态");
 
   // 解析新闻 JSON
   const topNews = extractNewsJSON(responseText);
@@ -143,6 +147,7 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
     topNews,
     iranCeasefire,
     hormuzStrait,
+    taoAnalysis,
     generatedAt: new Date().toISOString(),
     dataTimestamp: data.timestamp,
   };

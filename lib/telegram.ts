@@ -146,6 +146,11 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     lines.push(`⛽ <b>霍尔木兹海峡</b>`);
     lines.push(analysis.hormuzStrait);
   }
+  if (analysis.taoAnalysis) {
+    lines.push("");
+    lines.push(`🤖 <b>TAO (Bittensor) 动态</b>`);
+    lines.push(analysis.taoAnalysis);
+  }
 
   // ---- 持仓快览 ----
   const stockTickers = Object.keys(data.stocks);
@@ -202,6 +207,7 @@ function splitMessage(message: string): string[] {
     "💼 <b>操作建议</b>",
     "🌍 <b>伊朗停火进展</b>",
     "⛽ <b>霍尔木兹海峡</b>",
+    "🤖 <b>TAO (Bittensor) 动态</b>",
     "📈 <b>美股持仓</b>",
     "₿ <b>加密持仓</b>",
     "📰 <b>今日必看新闻</b>",

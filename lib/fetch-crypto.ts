@@ -11,6 +11,7 @@ const CRYPTO_MAP: { [instId: string]: string } = {
   "XAUT-USDT": "XAUT",
   "HYPE-USDT": "HYPE",
   "VIRTUAL-USDT": "VIRTUAL",
+  "TAO-USDT": "TAO",
 };
 
 /** 从 OKX 获取单个交易对的行情 */

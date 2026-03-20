@@ -108,6 +108,7 @@ const CRYPTO_META: Record<string, { name: string; note: string }> = {
   XAUT: { name: "Tether黄金", note: "避险资产，锚定实物黄金" },
   HYPE: { name: "Hyperliquid", note: "去中心化衍生品协议" },
   VIRTUAL: { name: "Virtuals Protocol", note: "AI Agent叙事，高Beta资产" },
+  TAO: { name: "Bittensor", note: "去中心化AI网络，AI+Crypto核心标的" },
 };
 
 // ========== UI 组件 ==========
@@ -647,6 +648,19 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
             <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
               <Badge color={COLORS.purple}>AI 生成</Badge>
               <span style={{ marginLeft: 6 }}>数据来源: OpenNews, OpenTwitter, Finnhub</span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* TAO/Bittensor 专题 */}
+      {analysis?.taoAnalysis && (
+        <Card title="TAO (Bittensor) 动态" icon="🤖" accent={COLORS.accent}>
+          <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
+            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.taoAnalysis}</div>
+            <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
+              <Badge color={COLORS.purple}>AI 生成</Badge>
+              <span style={{ marginLeft: 6 }}>数据来源: OpenNews, OpenTwitter</span>
             </div>
           </div>
         </Card>
