@@ -102,6 +102,9 @@ export interface AIAnalysis {
   iranCeasefire: string;      // 美国-伊朗停火进展分析
   hormuzStrait: string;       // 霍尔木兹海峡封锁风险分析
   taoAnalysis: string;        // Bittensor (TAO) 项目动态分析
+  bnbAnalysis: string;        // BNB/币安链动态分析
+  solanaAnalysis: string;     // Solana (SOL) 生态动态分析
+  tempusAiAnalysis: string;   // Tempus AI (TEM) 动态分析
   generatedAt: string;        // 生成时间（ISO 格式）
   dataTimestamp: string;      // 基于的市场数据时间戳
 }

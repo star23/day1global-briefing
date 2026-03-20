@@ -92,6 +92,9 @@ export interface GeopoliticalNews {
   iranCeasefire: GeoNewsItem[];
   hormuzStrait: GeoNewsItem[];
   tao: GeoNewsItem[];
+  bnb: GeoNewsItem[];
+  solana: GeoNewsItem[];
+  tempusAi: GeoNewsItem[];
 }
 
 /** 获取专题新闻（地缘政治 + 关注币种） */
@@ -99,20 +102,17 @@ export async function fetchGeopoliticalNews(): Promise<GeopoliticalNews> {
   const token = process.env.NEWS_6551_TOKEN;
   if (!token) {
     console.error("[Geopolitical] NEWS_6551_TOKEN 未设置，跳过专题新闻获取");
-    return { iranCeasefire: [], hormuzStrait: [], tao: [] };
+    return { iranCeasefire: [], hormuzStrait: [], tao: [], bnb: [], solana: [], tempusAi: [] };
   }
 
   // 并发搜索所有主题（新闻 + 推文）
   const [
-    ceaseNewsEn,
-    ceaseNewsCn,
-    ceaseTweetsEn,
-    hormuzNewsEn,
-    hormuzNewsCn,
-    hormuzTweetsEn,
-    taoNewsEn,
-    taoNewsCn,
-    taoTweetsEn,
+    ceaseNewsEn, ceaseNewsCn, ceaseTweetsEn,
+    hormuzNewsEn, hormuzNewsCn, hormuzTweetsEn,
+    taoNewsEn, taoNewsCn, taoTweetsEn,
+    bnbNewsEn, bnbTweetsEn,
+    solNewsEn, solTweetsEn,
+    temNewsEn, temTweetsEn,
   ] = await Promise.all([
     searchNews(token, "Iran ceasefire war", 10),
     searchNews(token, "伊朗 停火", 5),
@@ -123,18 +123,30 @@ export async function fetchGeopoliticalNews(): Promise<GeopoliticalNews> {
     searchNews(token, "Bittensor TAO", 10),
     searchNews(token, "TAO Bittensor 去中心化AI", 5),
     searchTwitter(token, "Bittensor TAO subnet", 10),
+    searchNews(token, "BNB Binance BNB Chain", 10),
+    searchTwitter(token, "BNB Binance Chain", 10),
+    searchNews(token, "Solana SOL ecosystem", 10),
+    searchTwitter(token, "Solana SOL DeFi", 10),
+    searchNews(token, "Tempus AI TEM precision medicine", 10),
+    searchTwitter(token, "Tempus AI TEM stock", 10),
   ]);
 
   const taoAll = [...taoNewsEn, ...taoNewsCn, ...taoTweetsEn];
+  const bnbAll = [...bnbNewsEn, ...bnbTweetsEn];
+  const solAll = [...solNewsEn, ...solTweetsEn];
+  const temAll = [...temNewsEn, ...temTweetsEn];
 
   console.log(
-    `[Topics] 新闻获取完成: 停火 ${ceaseNewsEn.length + ceaseNewsCn.length + ceaseTweetsEn.length} 条, 海峡 ${hormuzNewsEn.length + hormuzNewsCn.length + hormuzTweetsEn.length} 条, TAO ${taoAll.length} 条`
+    `[Topics] 新闻获取完成: 停火 ${ceaseNewsEn.length + ceaseNewsCn.length + ceaseTweetsEn.length}, 海峡 ${hormuzNewsEn.length + hormuzNewsCn.length + hormuzTweetsEn.length}, TAO ${taoAll.length}, BNB ${bnbAll.length}, SOL ${solAll.length}, TEM ${temAll.length}`
   );
 
   return {
     iranCeasefire: [...ceaseNewsEn, ...ceaseNewsCn, ...ceaseTweetsEn],
     hormuzStrait: [...hormuzNewsEn, ...hormuzNewsCn, ...hormuzTweetsEn],
     tao: taoAll,
+    bnb: bnbAll,
+    solana: solAll,
+    tempusAi: temAll,
   };
 }
 
@@ -170,6 +182,36 @@ export function formatGeopoliticalNewsForPrompt(geo: GeopoliticalNews): string {
       )
       .join("\n\n");
     sections.push(`【主题C：Bittensor (TAO) 相关新闻和推文（共${geo.tao.length}条）】\n${items}`);
+  }
+
+  if (geo.bnb.length > 0) {
+    const items = geo.bnb
+      .map(
+        (n, i) =>
+          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
+      )
+      .join("\n\n");
+    sections.push(`【主题D：BNB/币安链 相关新闻和推文（共${geo.bnb.length}条）】\n${items}`);
+  }
+
+  if (geo.solana.length > 0) {
+    const items = geo.solana
+      .map(
+        (n, i) =>
+          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
+      )
+      .join("\n\n");
+    sections.push(`【主题E：Solana (SOL) 相关新闻和推文（共${geo.solana.length}条）】\n${items}`);
+  }
+
+  if (geo.tempusAi.length > 0) {
+    const items = geo.tempusAi
+      .map(
+        (n, i) =>
+          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
+      )
+      .join("\n\n");
+    sections.push(`【主题F：Tempus AI (TEM) 相关新闻和推文（共${geo.tempusAi.length}条）】\n${items}`);
   }
 
   return sections.length > 0 ? "\n\n" + sections.join("\n\n") : "";

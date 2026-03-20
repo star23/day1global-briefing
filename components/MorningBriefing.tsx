@@ -100,6 +100,7 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   CRCL: { name: "Circle", note: "稳定币龙头，ARK持续加仓" },
   HOOD: { name: "Robinhood", note: "加密+零售交易平台" },
   COIN: { name: "Coinbase", note: "加密交易所龙头" },
+  TEM: { name: "Tempus AI", note: "AI医疗诊断平台，精准医疗赛道" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {
@@ -109,6 +110,8 @@ const CRYPTO_META: Record<string, { name: string; note: string }> = {
   HYPE: { name: "Hyperliquid", note: "去中心化衍生品协议" },
   VIRTUAL: { name: "Virtuals Protocol", note: "AI Agent叙事，高Beta资产" },
   TAO: { name: "Bittensor", note: "去中心化AI网络，AI+Crypto核心标的" },
+  BNB: { name: "币安币", note: "币安生态核心，BNB Chain生态持续扩展" },
+  SOL: { name: "Solana", note: "高性能公链，DeFi/NFT/Meme生态活跃" },
 };
 
 // ========== UI 组件 ==========
@@ -653,11 +656,46 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
         </Card>
       )}
 
-      {/* TAO/Bittensor 专题 */}
-      {analysis?.taoAnalysis && (
-        <Card title="TAO (Bittensor) 动态" icon="🤖" accent={COLORS.accent}>
+      {/* 项目动态专题 */}
+      {analysis && (analysis.taoAnalysis || analysis.bnbAnalysis || analysis.solanaAnalysis || analysis.tempusAiAnalysis) && (
+        <Card title="项目动态追踪" icon="🔍" accent={COLORS.accent}>
           <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
-            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.taoAnalysis}</div>
+            {analysis.taoAnalysis && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Badge color={COLORS.accent}>TAO</Badge>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>Bittensor 去中心化AI网络</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.taoAnalysis}</div>
+              </div>
+            )}
+            {analysis.bnbAnalysis && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Badge color={COLORS.orange}>BNB</Badge>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>币安生态</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.bnbAnalysis}</div>
+              </div>
+            )}
+            {analysis.solanaAnalysis && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Badge color={COLORS.purple}>SOL</Badge>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>Solana 生态</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.solanaAnalysis}</div>
+              </div>
+            )}
+            {analysis.tempusAiAnalysis && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Badge color={COLORS.green}>TEM</Badge>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>Tempus AI 精准医疗</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.tempusAiAnalysis}</div>
+              </div>
+            )}
             <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
               <Badge color={COLORS.purple}>AI 生成</Badge>
               <span style={{ marginLeft: 6 }}>数据来源: OpenNews, OpenTwitter</span>
