@@ -1,5 +1,6 @@
 // ========== 获取加密货币数据 ==========
 // 使用 OKX 公共 API 获取加密货币实时价格和24小时涨跌幅
+// TAO 使用 Binance API（OKX 未上架）
 // 无需 API Key，限流 20次/2秒
 
 import { CryptoData } from "./types";
@@ -11,9 +12,13 @@ const CRYPTO_MAP: { [instId: string]: string } = {
   "XAUT-USDT": "XAUT",
   "HYPE-USDT": "HYPE",
   "VIRTUAL-USDT": "VIRTUAL",
-  "TAO-USDT": "TAO",
   "BNB-USDT": "BNB",
   "SOL-USDT": "SOL",
+};
+
+// Binance 交易对（OKX 未上架的币种）
+const BINANCE_MAP: { [symbol: string]: string } = {
+  "TAOUSDT": "TAO",
 };
 
 /** 从 OKX 获取单个交易对的行情 */
@@ -50,23 +55,57 @@ async function fetchOKXTicker(
   }
 }
 
+/** 从 Binance 获取单个交易对的行情 */
+async function fetchBinanceTicker(
+  symbol: string
+): Promise<{ price: number; change24h: number } | null> {
+  try {
+    const url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+
+    if (!res.ok) {
+      console.error(`Binance API 请求失败 [${symbol}]: ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const last = parseFloat(data.lastPrice);
+    const change24h = parseFloat(data.priceChangePercent);
+
+    return { price: last, change24h };
+  } catch (err) {
+    console.error(`获取 Binance ${symbol} 数据出错:`, err);
+    return null;
+  }
+}
+
 /** 获取所有加密货币数据 */
 export async function fetchAllCrypto(): Promise<{
   [ticker: string]: CryptoData;
 }> {
   const results: { [ticker: string]: CryptoData } = {};
 
-  // 并发请求所有交易对
-  const entries = Object.entries(CRYPTO_MAP);
-  const promises = entries.map(async ([instId, ticker]) => {
-    const data = await fetchOKXTicker(instId);
-    if (data) {
-      results[ticker] = {
-        price: data.price,
-        change24h: data.change24h,
-      };
-    }
-  });
+  // 并发请求 OKX + Binance 交易对
+  const okxEntries = Object.entries(CRYPTO_MAP);
+  const binanceEntries = Object.entries(BINANCE_MAP);
+
+  const promises = [
+    ...okxEntries.map(async ([instId, ticker]) => {
+      const data = await fetchOKXTicker(instId);
+      if (data) {
+        results[ticker] = { price: data.price, change24h: data.change24h };
+      }
+    }),
+    ...binanceEntries.map(async ([symbol, ticker]) => {
+      const data = await fetchBinanceTicker(symbol);
+      if (data) {
+        results[ticker] = { price: data.price, change24h: data.change24h };
+      }
+    }),
+  ];
 
   await Promise.all(promises);
   return results;
