@@ -1,7 +1,7 @@
 // ========== 获取加密货币数据 ==========
 // 使用 OKX 公共 API 获取加密货币实时价格和24小时涨跌幅
-// TAO 使用 Binance API（OKX 未上架）
-// 无需 API Key，限流 20次/2秒
+// TAO 使用 Binance API（OKX 未上架），带多域名 fallback
+// 无需 API Key
 
 import { CryptoData } from "./types";
 
@@ -20,6 +20,15 @@ const CRYPTO_MAP: { [instId: string]: string } = {
 const BINANCE_MAP: { [symbol: string]: string } = {
   "TAOUSDT": "TAO",
 };
+
+// Binance API 域名列表（按优先级排列，部分地区主域名不可用时自动 fallback）
+const BINANCE_HOSTS = [
+  "api.binance.com",
+  "api1.binance.com",
+  "api2.binance.com",
+  "api3.binance.com",
+  "api4.binance.com",
+];
 
 /** 从 OKX 获取单个交易对的行情 */
 async function fetchOKXTicker(
@@ -55,31 +64,43 @@ async function fetchOKXTicker(
   }
 }
 
-/** 从 Binance 获取单个交易对的行情 */
+/** 从 Binance 获取单个交易对的行情（多域名 fallback） */
 async function fetchBinanceTicker(
   symbol: string
 ): Promise<{ price: number; change24h: number } | null> {
-  try {
-    const url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`;
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
+  for (const host of BINANCE_HOSTS) {
+    try {
+      const url = `https://${host}/api/v3/ticker/24hr?symbol=${symbol}`;
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+      });
 
-    if (!res.ok) {
-      console.error(`Binance API 请求失败 [${symbol}]: ${res.status}`);
-      return null;
+      if (!res.ok) {
+        console.warn(`[Binance] ${host} 请求失败 [${symbol}]: ${res.status}, 尝试下一个域名`);
+        continue;
+      }
+
+      const data = await res.json();
+      const last = parseFloat(data.lastPrice);
+      const change24h = parseFloat(data.priceChangePercent);
+
+      if (isNaN(last) || isNaN(change24h)) {
+        console.error(`[Binance] ${host} 数据解析异常 [${symbol}]:`, JSON.stringify(data).slice(0, 200));
+        continue;
+      }
+
+      console.log(`[Binance] ${host} 获取 ${symbol} 成功: $${last} (${change24h}%)`);
+      return { price: last, change24h };
+    } catch (err) {
+      console.warn(`[Binance] ${host} 请求出错 [${symbol}]:`, (err as Error).message);
+      continue;
     }
-
-    const data = await res.json();
-    const last = parseFloat(data.lastPrice);
-    const change24h = parseFloat(data.priceChangePercent);
-
-    return { price: last, change24h };
-  } catch (err) {
-    console.error(`获取 Binance ${symbol} 数据出错:`, err);
-    return null;
   }
+
+  console.error(`[Binance] 所有域名均失败 [${symbol}]`);
+  return null;
 }
 
 /** 获取所有加密货币数据 */
