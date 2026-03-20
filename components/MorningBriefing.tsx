@@ -108,6 +108,7 @@ const CRYPTO_META: Record<string, { name: string; note: string }> = {
   XAUT: { name: "Tether黄金", note: "避险资产，锚定实物黄金" },
   HYPE: { name: "Hyperliquid", note: "去中心化衍生品协议" },
   VIRTUAL: { name: "Virtuals Protocol", note: "AI Agent叙事，高Beta资产" },
+  TAO: { name: "Bittensor", note: "去中心化AI网络，AI+Crypto核心标的" },
 };
 
 // ========== UI 组件 ==========
