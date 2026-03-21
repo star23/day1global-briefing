@@ -146,15 +146,15 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     lines.push(`⛽ <b>霍尔木兹海峡</b>`);
     lines.push(analysis.hormuzStrait);
   }
-  if (analysis.cryptoTopicsAnalysis) {
-    lines.push("");
-    lines.push(`🪙 <b>加密标的动态</b>`);
-    lines.push(analysis.cryptoTopicsAnalysis);
-  }
   if (analysis.stockTopicsAnalysis) {
     lines.push("");
     lines.push(`📊 <b>美股标的动态</b>`);
     lines.push(analysis.stockTopicsAnalysis);
+  }
+  if (analysis.cryptoTopicsAnalysis) {
+    lines.push("");
+    lines.push(`🪙 <b>加密标的动态</b>`);
+    lines.push(analysis.cryptoTopicsAnalysis);
   }
 
   // ---- 持仓快览 ----
@@ -212,8 +212,8 @@ function splitMessage(message: string): string[] {
     "💼 <b>操作建议</b>",
     "🌍 <b>伊朗停火进展</b>",
     "⛽ <b>霍尔木兹海峡</b>",
-    "🪙 <b>加密标的动态</b>",
     "📊 <b>美股标的动态</b>",
+    "🪙 <b>加密标的动态</b>",
     "📈 <b>美股持仓</b>",
     "₿ <b>加密持仓</b>",
     "📰 <b>今日必看新闻</b>",
