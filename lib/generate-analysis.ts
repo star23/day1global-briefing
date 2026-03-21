@@ -64,7 +64,7 @@ function formatNewsForPrompt(news: RawNewsItem[]): string {
 export async function generateMarketAnalysis(
   data: MarketDataResponse,
   rawNews: RawNewsItem[] = [],
-  geoNews: GeopoliticalNews = { iranCeasefire: [], hormuzStrait: [], tao: [], bnb: [], solana: [], tempusAi: [] }
+  geoNews: GeopoliticalNews = { iranCeasefire: [], hormuzStrait: [], cryptoTopics: {}, stockTopics: {} }
 ): Promise<AIAnalysis> {
   const marketSummary = formatMarketDataForPrompt(data);
   const newsSummary = formatNewsForPrompt(rawNews);
@@ -94,17 +94,13 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 ===霍尔木兹海峡===
 （基于主题B的新闻和推文，分析伊朗是否会封锁霍尔木兹海峡。包括：伊朗的最新军事动态和官方声明、海峡通航的实际状况、对全球原油供应和油价的影响评估、各方的应对措施。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
 
-===TAO动态===
-（基于主题C的新闻和推文，分析Bittensor (TAO) 项目的最新动态。包括：子网（subnet）生态发展、重大合作/集成、社区治理更新、代币经济变化、与其他AI项目的竞争格局。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
+===加密标的动态===
+（基于【加密标的相关新闻】，逐一分析每个持仓加密标的的最新动态。覆盖标的：BTC、ETH、XAUT、HYPE、VIRTUAL、TAO、BNB、SOL。
+每个标的用「▸ 标的名」开头，写1-2句话总结最新进展和值得关注的信号。如果某个标的没有相关新闻则跳过不写。整体控制在 500 字以内。）
 
-===BNB动态===
-（基于主题D的新闻和推文，分析BNB和币安链生态的最新动态。包括：币安平台重大公告、BNB Chain生态项目进展、DeFi/GameFi生态发展、监管动态。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
-
-===Solana动态===
-（基于主题E的新闻和推文，分析Solana (SOL) 生态的最新动态。包括：链上TVL和活跃度变化、重要DeFi/NFT/Meme项目进展、技术升级、机构采用情况。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
-
-===TempusAI动态===
-（基于主题F的新闻和推文，分析Tempus AI (TEM) 的最新动态。包括：公司业务进展、AI医疗诊断产品更新、财报/营收情况、合作伙伴与市场扩张、竞争格局。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
+===美股标的动态===
+（基于【美股标的相关新闻】，逐一分析每个持仓美股标的的最新动态。覆盖标的：NVDA、TSLA、GOOG、RKLB、CRCL、HOOD、COIN、TEM、Stripe。
+每个标的用「▸ 标的名」开头，写1-2句话总结最新进展和值得关注的信号。如果某个标的没有相关新闻则跳过不写。整体控制在 500 字以内。）
 
 ===今日必看===
 从以上新闻中精选10条对投资者最重要的新闻（如果新闻不足10条则有多少选多少），输出一个合法的JSON数组。每条包含：
@@ -123,7 +119,8 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 - 分析要基于实际数据，不要泛泛而谈
 - 语气专业但通俗易懂（读者可能是非专业投资者）
 - 宏观判断、加密分析、操作建议每个部分控制在 200 字以内
-- 伊朗停火、霍尔木兹海峡、TAO动态、BNB动态、Solana动态、TempusAI动态每个部分控制在 300 字以内
+- 伊朗停火、霍尔木兹海峡每个部分控制在 300 字以内
+- 加密标的动态、美股标的动态每个部分控制在 500 字以内
 - 今日必看的JSON必须是合法的JSON数组，可以直接被 JSON.parse 解析`;
 
   const message = await anthropic.messages.create({
@@ -144,10 +141,8 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
   const actionSuggestions = extractSection(responseText, "操作建议");
   const iranCeasefire = extractSection(responseText, "伊朗停火");
   const hormuzStrait = extractSection(responseText, "霍尔木兹海峡");
-  const taoAnalysis = extractSection(responseText, "TAO动态");
-  const bnbAnalysis = extractSection(responseText, "BNB动态");
-  const solanaAnalysis = extractSection(responseText, "Solana动态");
-  const tempusAiAnalysis = extractSection(responseText, "TempusAI动态");
+  const cryptoTopicsAnalysis = extractSection(responseText, "加密标的动态");
+  const stockTopicsAnalysis = extractSection(responseText, "美股标的动态");
 
   // 解析新闻 JSON
   const topNews = extractNewsJSON(responseText);
@@ -159,10 +154,8 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
     topNews,
     iranCeasefire,
     hormuzStrait,
-    taoAnalysis,
-    bnbAnalysis,
-    solanaAnalysis,
-    tempusAiAnalysis,
+    cryptoTopicsAnalysis,
+    stockTopicsAnalysis,
     generatedAt: new Date().toISOString(),
     dataTimestamp: data.timestamp,
   };
