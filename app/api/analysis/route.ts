@@ -31,8 +31,8 @@ export async function GET() {
 
     return NextResponse.json(analysis, {
       headers: {
-        // AI 分析每天只更新一次，缓存 5 分钟
-        "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
+        // AI 分析每天更新一次，CDN 缓存 1 分钟
+        "Cache-Control": "s-maxage=60, stale-while-revalidate=120",
       },
     });
   } catch (err) {

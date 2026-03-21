@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         await redis.set("ai-analysis", analysis, { ex: 86400 });
 
         console.log(
-          `[Cron] AI 分析已生成并存储: ${analysis.generatedAt}，精选新闻 ${newsCount} 条`
+          `[Cron] AI 分析已生成并存储: ${analysis.generatedAt}，精选新闻 ${newsCount} 条，加密标的动态: ${analysis.cryptoTopicsAnalysis?.length ?? 0}字，美股标的动态: ${analysis.stockTopicsAnalysis?.length ?? 0}字`
         );
         analysisGenerated = true;
 
