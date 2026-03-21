@@ -259,7 +259,7 @@ export default function MorningBriefing() {
   const { data: analysis } = useSWR<AIAnalysis>(
     "/api/analysis",
     fetcher,
-    { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
+    { refreshInterval: 5 * 60 * 1000, revalidateOnFocus: true }
   );
 
   const { data: metricsHistory } = useSWR<MetricsHistoryResponse>(
