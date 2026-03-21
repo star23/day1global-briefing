@@ -656,11 +656,11 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
         </Card>
       )}
 
-      {/* 加密标的动态 */}
-      {analysis?.cryptoTopicsAnalysis && (
-        <Card title="加密标的动态" icon="🪙" accent={COLORS.accent}>
+      {/* 美股标的动态 */}
+      {analysis?.stockTopicsAnalysis && (
+        <Card title="美股标的动态" icon="📊" accent={COLORS.green}>
           <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
-            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.cryptoTopicsAnalysis}</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.stockTopicsAnalysis}</div>
             <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
               <Badge color={COLORS.purple}>AI 生成</Badge>
               <span style={{ marginLeft: 6 }}>数据来源: OpenNews</span>
@@ -669,11 +669,11 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
         </Card>
       )}
 
-      {/* 美股标的动态 */}
-      {analysis?.stockTopicsAnalysis && (
-        <Card title="美股标的动态" icon="📊" accent={COLORS.green}>
+      {/* 加密标的动态 */}
+      {analysis?.cryptoTopicsAnalysis && (
+        <Card title="加密标的动态" icon="🪙" accent={COLORS.accent}>
           <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
-            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.stockTopicsAnalysis}</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.cryptoTopicsAnalysis}</div>
             <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
               <Badge color={COLORS.purple}>AI 生成</Badge>
               <span style={{ marginLeft: 6 }}>数据来源: OpenNews</span>
