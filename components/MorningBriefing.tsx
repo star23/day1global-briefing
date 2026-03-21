@@ -656,49 +656,27 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
         </Card>
       )}
 
-      {/* 项目动态专题 */}
-      {analysis && (analysis.taoAnalysis || analysis.bnbAnalysis || analysis.solanaAnalysis || analysis.tempusAiAnalysis) && (
-        <Card title="项目动态追踪" icon="🔍" accent={COLORS.accent}>
+      {/* 加密标的动态 */}
+      {analysis?.cryptoTopicsAnalysis && (
+        <Card title="加密标的动态" icon="🪙" accent={COLORS.accent}>
           <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
-            {analysis.taoAnalysis && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <Badge color={COLORS.accent}>TAO</Badge>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>Bittensor 去中心化AI网络</span>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.taoAnalysis}</div>
-              </div>
-            )}
-            {analysis.bnbAnalysis && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <Badge color={COLORS.orange}>BNB</Badge>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>币安生态</span>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.bnbAnalysis}</div>
-              </div>
-            )}
-            {analysis.solanaAnalysis && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <Badge color={COLORS.purple}>SOL</Badge>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>Solana 生态</span>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.solanaAnalysis}</div>
-              </div>
-            )}
-            {analysis.tempusAiAnalysis && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <Badge color={COLORS.green}>TEM</Badge>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.text }}>Tempus AI 精准医疗</span>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{analysis.tempusAiAnalysis}</div>
-              </div>
-            )}
+            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.cryptoTopicsAnalysis}</div>
             <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
               <Badge color={COLORS.purple}>AI 生成</Badge>
-              <span style={{ marginLeft: 6 }}>数据来源: OpenNews, OpenTwitter</span>
+              <span style={{ marginLeft: 6 }}>数据来源: OpenNews</span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* 美股标的动态 */}
+      {analysis?.stockTopicsAnalysis && (
+        <Card title="美股标的动态" icon="📊" accent={COLORS.green}>
+          <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
+            <div style={{ whiteSpace: "pre-wrap" }}>{analysis.stockTopicsAnalysis}</div>
+            <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
+              <Badge color={COLORS.purple}>AI 生成</Badge>
+              <span style={{ marginLeft: 6 }}>数据来源: OpenNews</span>
             </div>
           </div>
         </Card>

@@ -146,25 +146,15 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     lines.push(`⛽ <b>霍尔木兹海峡</b>`);
     lines.push(analysis.hormuzStrait);
   }
-  if (analysis.taoAnalysis) {
+  if (analysis.cryptoTopicsAnalysis) {
     lines.push("");
-    lines.push(`🤖 <b>TAO (Bittensor) 动态</b>`);
-    lines.push(analysis.taoAnalysis);
+    lines.push(`🪙 <b>加密标的动态</b>`);
+    lines.push(analysis.cryptoTopicsAnalysis);
   }
-  if (analysis.bnbAnalysis) {
+  if (analysis.stockTopicsAnalysis) {
     lines.push("");
-    lines.push(`🟡 <b>BNB 币安生态动态</b>`);
-    lines.push(analysis.bnbAnalysis);
-  }
-  if (analysis.solanaAnalysis) {
-    lines.push("");
-    lines.push(`🟣 <b>Solana (SOL) 动态</b>`);
-    lines.push(analysis.solanaAnalysis);
-  }
-  if (analysis.tempusAiAnalysis) {
-    lines.push("");
-    lines.push(`🧬 <b>Tempus AI (TEM) 动态</b>`);
-    lines.push(analysis.tempusAiAnalysis);
+    lines.push(`📊 <b>美股标的动态</b>`);
+    lines.push(analysis.stockTopicsAnalysis);
   }
 
   // ---- 持仓快览 ----
@@ -222,10 +212,8 @@ function splitMessage(message: string): string[] {
     "💼 <b>操作建议</b>",
     "🌍 <b>伊朗停火进展</b>",
     "⛽ <b>霍尔木兹海峡</b>",
-    "🤖 <b>TAO (Bittensor) 动态</b>",
-    "🟡 <b>BNB 币安生态动态</b>",
-    "🟣 <b>Solana (SOL) 动态</b>",
-    "🧬 <b>Tempus AI (TEM) 动态</b>",
+    "🪙 <b>加密标的动态</b>",
+    "📊 <b>美股标的动态</b>",
     "📈 <b>美股持仓</b>",
     "₿ <b>加密持仓</b>",
     "📰 <b>今日必看新闻</b>",

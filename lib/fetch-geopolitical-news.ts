@@ -1,4 +1,4 @@
-// ========== 获取地缘政治新闻 ==========
+// ========== 获取专题新闻 ==========
 // 从 6551.io API (opennews + opentwitter) 获取特定主题的新闻和推文
 // 需要环境变量: NEWS_6551_TOKEN
 
@@ -88,130 +88,170 @@ async function searchTwitter(
   }
 }
 
+// ========== 搜索主题配置 ==========
+
+/** 地缘政治主题（新闻 + 中文 + 推文） */
+const GEO_TOPICS = [
+  { key: "iranCeasefire", label: "美国-伊朗停火/战争进展", newsEn: "Iran ceasefire war", newsCn: "伊朗 停火", tweets: "Iran ceasefire war deal" },
+  { key: "hormuzStrait", label: "伊朗与霍尔木兹海峡", newsEn: "Hormuz strait blockade Iran", newsCn: "霍尔木兹海峡 封锁", tweets: "Strait of Hormuz Iran blockade" },
+] as const;
+
+/** 加密标的主题（每个标的 1 条新闻搜索） */
+const CRYPTO_TOPICS = [
+  { key: "BTC", label: "Bitcoin (BTC)", query: "Bitcoin BTC ETF" },
+  { key: "ETH", label: "Ethereum (ETH)", query: "Ethereum ETH upgrade DeFi" },
+  { key: "XAUT", label: "Tether Gold (XAUT)", query: "Tether Gold XAUT" },
+  { key: "HYPE", label: "Hyperliquid (HYPE)", query: "Hyperliquid HYPE" },
+  { key: "VIRTUAL", label: "Virtuals Protocol (VIRTUAL)", query: "Virtuals Protocol VIRTUAL AI agent" },
+  { key: "TAO", label: "Bittensor (TAO)", query: "Bittensor TAO subnet" },
+  { key: "BNB", label: "BNB Chain", query: "BNB Binance Chain" },
+  { key: "SOL", label: "Solana (SOL)", query: "Solana SOL ecosystem" },
+] as const;
+
+/** 美股标的主题（每个标的 1 条新闻搜索） */
+const STOCK_TOPICS = [
+  { key: "NVDA", label: "英伟达 (NVDA)", query: "Nvidia NVDA AI GPU" },
+  { key: "TSLA", label: "特斯拉 (TSLA)", query: "Tesla TSLA" },
+  { key: "GOOG", label: "Google (GOOG)", query: "Google Alphabet GOOG AI" },
+  { key: "RKLB", label: "Rocket Lab (RKLB)", query: "Rocket Lab RKLB Neutron" },
+  { key: "CRCL", label: "Circle (CRCL)", query: "Circle CRCL stablecoin USDC" },
+  { key: "HOOD", label: "Robinhood (HOOD)", query: "Robinhood HOOD crypto" },
+  { key: "COIN", label: "Coinbase (COIN)", query: "Coinbase COIN crypto" },
+  { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM precision medicine" },
+  { key: "Stripe", label: "Stripe", query: "Stripe payments fintech IPO" },
+] as const;
+
+// ========== 数据结构 ==========
+
 export interface GeopoliticalNews {
   iranCeasefire: GeoNewsItem[];
   hormuzStrait: GeoNewsItem[];
-  tao: GeoNewsItem[];
-  bnb: GeoNewsItem[];
-  solana: GeoNewsItem[];
-  tempusAi: GeoNewsItem[];
+  /** 加密标的新闻，key 为标的代码 (BTC, ETH, ...) */
+  cryptoTopics: Record<string, GeoNewsItem[]>;
+  /** 美股标的新闻，key 为标的代码 (NVDA, TSLA, ...) */
+  stockTopics: Record<string, GeoNewsItem[]>;
 }
 
-/** 获取专题新闻（地缘政治 + 关注币种） */
+const EMPTY_GEO_NEWS: GeopoliticalNews = {
+  iranCeasefire: [],
+  hormuzStrait: [],
+  cryptoTopics: {},
+  stockTopics: {},
+};
+
+/** 获取所有专题新闻（地缘政治 + 加密标的 + 美股标的） */
 export async function fetchGeopoliticalNews(): Promise<GeopoliticalNews> {
   const token = process.env.NEWS_6551_TOKEN;
   if (!token) {
-    console.error("[Geopolitical] NEWS_6551_TOKEN 未设置，跳过专题新闻获取");
-    return { iranCeasefire: [], hormuzStrait: [], tao: [], bnb: [], solana: [], tempusAi: [] };
+    console.error("[Topics] NEWS_6551_TOKEN 未设置，跳过专题新闻获取");
+    return EMPTY_GEO_NEWS;
   }
 
-  // 并发搜索所有主题（新闻 + 推文）
-  const [
-    ceaseNewsEn, ceaseNewsCn, ceaseTweetsEn,
-    hormuzNewsEn, hormuzNewsCn, hormuzTweetsEn,
-    taoNewsEn, taoNewsCn, taoTweetsEn,
-    bnbNewsEn, bnbTweetsEn,
-    solNewsEn, solTweetsEn,
-    temNewsEn, temTweetsEn,
-  ] = await Promise.all([
-    searchNews(token, "Iran ceasefire war", 10),
-    searchNews(token, "伊朗 停火", 5),
-    searchTwitter(token, "Iran ceasefire war deal", 10),
-    searchNews(token, "Hormuz strait blockade Iran", 10),
-    searchNews(token, "霍尔木兹海峡 封锁", 5),
-    searchTwitter(token, "Strait of Hormuz Iran blockade", 10),
-    searchNews(token, "Bittensor TAO", 10),
-    searchNews(token, "TAO Bittensor 去中心化AI", 5),
-    searchTwitter(token, "Bittensor TAO subnet", 10),
-    searchNews(token, "BNB Binance BNB Chain", 10),
-    searchTwitter(token, "BNB Binance Chain", 10),
-    searchNews(token, "Solana SOL ecosystem", 10),
-    searchTwitter(token, "Solana SOL DeFi", 10),
-    searchNews(token, "Tempus AI TEM precision medicine", 10),
-    searchTwitter(token, "Tempus AI TEM stock", 10),
+  // 1. 地缘政治搜索（每个主题 3 路：英文新闻 + 中文新闻 + 推文）
+  const geoPromises = GEO_TOPICS.flatMap((t) => [
+    searchNews(token, t.newsEn, 10),
+    searchNews(token, t.newsCn, 5),
+    searchTwitter(token, t.tweets, 10),
   ]);
 
-  const taoAll = [...taoNewsEn, ...taoNewsCn, ...taoTweetsEn];
-  const bnbAll = [...bnbNewsEn, ...bnbTweetsEn];
-  const solAll = [...solNewsEn, ...solTweetsEn];
-  const temAll = [...temNewsEn, ...temTweetsEn];
-
-  console.log(
-    `[Topics] 新闻获取完成: 停火 ${ceaseNewsEn.length + ceaseNewsCn.length + ceaseTweetsEn.length}, 海峡 ${hormuzNewsEn.length + hormuzNewsCn.length + hormuzTweetsEn.length}, TAO ${taoAll.length}, BNB ${bnbAll.length}, SOL ${solAll.length}, TEM ${temAll.length}`
+  // 2. 加密标的搜索（每个标的 1 路新闻，limit 5）
+  const cryptoPromises = CRYPTO_TOPICS.map((t) =>
+    searchNews(token, t.query, 5)
   );
 
+  // 3. 美股标的搜索（每个标的 1 路新闻，limit 5）
+  const stockPromises = STOCK_TOPICS.map((t) =>
+    searchNews(token, t.query, 5)
+  );
+
+  // 全部并发
+  const allResults = await Promise.all([
+    ...geoPromises,
+    ...cryptoPromises,
+    ...stockPromises,
+  ]);
+
+  // 拆分结果
+  let idx = 0;
+
+  // 地缘政治（每个主题 3 个结果）
+  const geoResults: Record<string, GeoNewsItem[]> = {};
+  for (const t of GEO_TOPICS) {
+    const newsEn = allResults[idx++];
+    const newsCn = allResults[idx++];
+    const tweets = allResults[idx++];
+    geoResults[t.key] = [...newsEn, ...newsCn, ...tweets];
+  }
+
+  // 加密标的（每个主题 1 个结果）
+  const cryptoTopics: Record<string, GeoNewsItem[]> = {};
+  for (const t of CRYPTO_TOPICS) {
+    cryptoTopics[t.key] = allResults[idx++];
+  }
+
+  // 美股标的（每个主题 1 个结果）
+  const stockTopics: Record<string, GeoNewsItem[]> = {};
+  for (const t of STOCK_TOPICS) {
+    stockTopics[t.key] = allResults[idx++];
+  }
+
+  // 日志
+  const cryptoCounts = CRYPTO_TOPICS.map((t) => `${t.key}:${cryptoTopics[t.key].length}`).join(" ");
+  const stockCounts = STOCK_TOPICS.map((t) => `${t.key}:${stockTopics[t.key].length}`).join(" ");
+  console.log(`[Topics] 地缘: 停火${geoResults.iranCeasefire.length} 海峡${geoResults.hormuzStrait.length} | 加密: ${cryptoCounts} | 美股: ${stockCounts}`);
+
   return {
-    iranCeasefire: [...ceaseNewsEn, ...ceaseNewsCn, ...ceaseTweetsEn],
-    hormuzStrait: [...hormuzNewsEn, ...hormuzNewsCn, ...hormuzTweetsEn],
-    tao: taoAll,
-    bnb: bnbAll,
-    solana: solAll,
-    tempusAi: temAll,
+    iranCeasefire: geoResults.iranCeasefire,
+    hormuzStrait: geoResults.hormuzStrait,
+    cryptoTopics,
+    stockTopics,
   };
 }
 
-/** 将地缘新闻格式化为 Claude 能理解的文本 */
+/** 格式化单个主题的新闻列表 */
+function formatTopicItems(items: GeoNewsItem[]): string {
+  return items
+    .map(
+      (n, i) =>
+        `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
+    )
+    .join("\n\n");
+}
+
+/** 将专题新闻格式化为 Claude 能理解的文本 */
 export function formatGeopoliticalNewsForPrompt(geo: GeopoliticalNews): string {
   const sections: string[] = [];
 
+  // 地缘政治
   if (geo.iranCeasefire.length > 0) {
-    const items = geo.iranCeasefire
-      .map(
-        (n, i) =>
-          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
-      )
-      .join("\n\n");
-    sections.push(`【主题A：美国-伊朗停火/战争进展相关新闻和推文（共${geo.iranCeasefire.length}条）】\n${items}`);
+    sections.push(`【主题A：美国-伊朗停火/战争进展（共${geo.iranCeasefire.length}条）】\n${formatTopicItems(geo.iranCeasefire)}`);
   }
-
   if (geo.hormuzStrait.length > 0) {
-    const items = geo.hormuzStrait
-      .map(
-        (n, i) =>
-          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
-      )
-      .join("\n\n");
-    sections.push(`【主题B：伊朗与霍尔木兹海峡相关新闻和推文（共${geo.hormuzStrait.length}条）】\n${items}`);
+    sections.push(`【主题B：伊朗与霍尔木兹海峡（共${geo.hormuzStrait.length}条）】\n${formatTopicItems(geo.hormuzStrait)}`);
   }
 
-  if (geo.tao.length > 0) {
-    const items = geo.tao
-      .map(
-        (n, i) =>
-          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
-      )
-      .join("\n\n");
-    sections.push(`【主题C：Bittensor (TAO) 相关新闻和推文（共${geo.tao.length}条）】\n${items}`);
+  // 加密标的新闻
+  const cryptoLines: string[] = [];
+  for (const t of CRYPTO_TOPICS) {
+    const items = geo.cryptoTopics[t.key] ?? [];
+    if (items.length > 0) {
+      cryptoLines.push(`  ▸ ${t.label}（${items.length}条）\n${formatTopicItems(items)}`);
+    }
+  }
+  if (cryptoLines.length > 0) {
+    sections.push(`【加密标的相关新闻】\n${cryptoLines.join("\n\n")}`);
   }
 
-  if (geo.bnb.length > 0) {
-    const items = geo.bnb
-      .map(
-        (n, i) =>
-          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
-      )
-      .join("\n\n");
-    sections.push(`【主题D：BNB/币安链 相关新闻和推文（共${geo.bnb.length}条）】\n${items}`);
+  // 美股标的新闻
+  const stockLines: string[] = [];
+  for (const t of STOCK_TOPICS) {
+    const items = geo.stockTopics[t.key] ?? [];
+    if (items.length > 0) {
+      stockLines.push(`  ▸ ${t.label}（${items.length}条）\n${formatTopicItems(items)}`);
+    }
   }
-
-  if (geo.solana.length > 0) {
-    const items = geo.solana
-      .map(
-        (n, i) =>
-          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
-      )
-      .join("\n\n");
-    sections.push(`【主题E：Solana (SOL) 相关新闻和推文（共${geo.solana.length}条）】\n${items}`);
-  }
-
-  if (geo.tempusAi.length > 0) {
-    const items = geo.tempusAi
-      .map(
-        (n, i) =>
-          `  [${i + 1}] ${n.title}\n      来源: ${n.source} | ${n.publishedAt}\n      ${n.summary}`
-      )
-      .join("\n\n");
-    sections.push(`【主题F：Tempus AI (TEM) 相关新闻和推文（共${geo.tempusAi.length}条）】\n${items}`);
+  if (stockLines.length > 0) {
+    sections.push(`【美股标的相关新闻】\n${stockLines.join("\n\n")}`);
   }
 
   return sections.length > 0 ? "\n\n" + sections.join("\n\n") : "";
