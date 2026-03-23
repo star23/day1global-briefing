@@ -117,7 +117,7 @@ const STOCK_TOPICS = [
   { key: "CRCL", label: "Circle (CRCL)", query: "Circle CRCL stablecoin USDC" },
   { key: "HOOD", label: "Robinhood (HOOD)", query: "Robinhood HOOD crypto" },
   { key: "COIN", label: "Coinbase (COIN)", query: "Coinbase COIN crypto" },
-  { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM precision medicine" },
+  { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM stock" },
   { key: "Stripe", label: "Stripe", query: "Stripe payments fintech IPO" },
 ] as const;
 
