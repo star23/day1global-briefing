@@ -118,6 +118,7 @@ const STOCK_TOPICS = [
   { key: "HOOD", label: "Robinhood (HOOD)", query: "Robinhood HOOD crypto" },
   { key: "COIN", label: "Coinbase (COIN)", query: "Coinbase COIN crypto" },
   { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM stock" },
+  { key: "GLD", label: "SPDR Gold (GLD)", query: "GLD SPDR gold ETF" },
   { key: "Stripe", label: "Stripe", query: "Stripe payments fintech IPO" },
 ] as const;
 
