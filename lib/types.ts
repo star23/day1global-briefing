@@ -52,6 +52,7 @@ export interface MarketDataResponse {
     [ticker: string]: CryptoData;
   };
   indices: {
+    sp500: IndexData;
     vix: IndexData;
     gold: IndexData;
     crudeOil: IndexData;

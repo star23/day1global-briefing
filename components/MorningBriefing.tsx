@@ -459,6 +459,9 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
   if (data?.stocks?.QQQM) {
     indices.push({ name: "QQQM (Nasdaq)", val: `$${formatPrice(data.stocks.QQQM.price)}`, chg: formatChange(data.stocks.QQQM.changePercent), color: getChangeColor(data.stocks.QQQM.changePercent) });
   }
+  if (data?.indices?.sp500) {
+    indices.push({ name: "S&P 500", val: formatPrice(data.indices.sp500.price), chg: formatChange(data.indices.sp500.changePercent), color: getChangeColor(data.indices.sp500.changePercent) });
+  }
   if (data?.indices?.vix) {
     indices.push({ name: "VIX", val: formatPrice(data.indices.vix.price), chg: formatChange(data.indices.vix.changePercent), color: getChangeColor(data.indices.vix.changePercent) });
   }
@@ -1294,6 +1297,17 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
       {/* 指数与商品 */}
       <Card title="📊 指数与避险资产" icon="" accent={COLORS.gold}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {data?.indices?.sp500 && (
+            <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14, textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: COLORS.muted }}>S&P 500</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: getChangeColor(data.indices.sp500.changePercent) }}>
+                {formatPrice(data.indices.sp500.price)}
+              </div>
+              <div style={{ fontSize: 11, color: getChangeColor(data.indices.sp500.changePercent), fontWeight: 600 }}>
+                {formatChange(data.indices.sp500.changePercent)}
+              </div>
+            </div>
+          )}
           {data?.indices?.vix && (
             <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14, textAlign: "center" }}>
               <div style={{ fontSize: 10, color: COLORS.muted }}>VIX 恐慌指数</div>

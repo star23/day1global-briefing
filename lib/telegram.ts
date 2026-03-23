@@ -88,6 +88,9 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   }
 
   // 指数
+  if (data.indices.sp500?.price) {
+    lines.push(`  S&P 500: ${fmtPrice(data.indices.sp500.price)} ${fmtChange(data.indices.sp500.changePercent)}`);
+  }
   if (data.indices.vix.price) {
     lines.push(`  VIX: ${fmtPrice(data.indices.vix.price)} ${fmtChange(data.indices.vix.changePercent)}`);
   }

@@ -33,6 +33,7 @@ ${stockLines || "  暂无数据"}
 ${cryptoLines || "  暂无数据"}
 
 【指数与商品】
+  S&P 500: ${data.indices.sp500.price.toFixed(2)} (${data.indices.sp500.changePercent >= 0 ? "+" : ""}${data.indices.sp500.changePercent.toFixed(2)}%)
   VIX 恐慌指数: ${data.indices.vix.price.toFixed(2)} (${data.indices.vix.changePercent >= 0 ? "+" : ""}${data.indices.vix.changePercent.toFixed(2)}%)
   黄金 (GC=F): $${data.indices.gold.price.toFixed(2)} (${data.indices.gold.changePercent >= 0 ? "+" : ""}${data.indices.gold.changePercent.toFixed(2)}%)
   原油 (CL=F): $${data.indices.crudeOil.price.toFixed(2)} (${data.indices.crudeOil.changePercent >= 0 ? "+" : ""}${data.indices.crudeOil.changePercent.toFixed(2)}%)
