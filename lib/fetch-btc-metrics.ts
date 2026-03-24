@@ -16,6 +16,7 @@ export interface BTCMetrics {
   ma365Price: number | null;          // BTC 365日均线价格
   ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
   etfFlowUsd: number | null;          // BTC ETF 每日净流入（美元）
+  etfFlowDays: number[];              // ETF 最近 6 日净流入数组（从最新到最旧）
   fundingRate: number | null;         // BTC 资金费率（Binance 8h 收盘）
   longShortRatio: number | null;      // 全球多空账户比
 }
@@ -159,9 +160,10 @@ async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | nul
 /**
  * 从 CoinGlass 获取 BTC ETF 每日净流入
  * 端点: /api/etf/bitcoin/flow-history
- * 因时差取倒数第二条的 flow_usd，同时返回最近 3 日数据用于趋势判断
+ * 取最近 6 天数据：如果最新一天为 0 则从倒数第二天开始
+ * 连续 3 天净流入 = 强买入信号，连续 5 天净流出 = 强卖出信号
  */
-async function fetchETFFlow(apiKey: string): Promise<{ etfFlowUsd: number | null; etfFlow3d: number[] }> {
+async function fetchETFFlow(apiKey: string): Promise<{ etfFlowUsd: number | null; etfFlowDays: number[] }> {
   try {
     const res = await fetch(`${COINGLASS_BASE}/api/etf/bitcoin/flow-history`, {
       cache: "no-store",
@@ -169,31 +171,34 @@ async function fetchETFFlow(apiKey: string): Promise<{ etfFlowUsd: number | null
     });
     if (!res.ok) {
       console.error(`[CoinGlass] ETF Flow 请求失败: ${res.status}`);
-      return { etfFlowUsd: null, etfFlow3d: [] };
+      return { etfFlowUsd: null, etfFlowDays: [] };
     }
     const json = await res.json();
     if (json.code !== "0" || !Array.isArray(json.data) || json.data.length < 2) {
       console.error(`[CoinGlass] ETF Flow 数据异常:`, json.msg || "无数据");
-      return { etfFlowUsd: null, etfFlow3d: [] };
+      return { etfFlowUsd: null, etfFlowDays: [] };
     }
-    // 因时差取倒数第二条作为"昨日"数据
     const len = json.data.length;
-    const latest = json.data[len - 2];
-    const flowUsd = Number(latest.flow_usd);
-    if (isNaN(flowUsd)) return { etfFlowUsd: null, etfFlow3d: [] };
 
-    // 最近 3 日: 倒数第 2、3、4 条
-    const etfFlow3d: number[] = [];
-    for (let i = 2; i <= 4 && i <= len; i++) {
-      const v = Number(json.data[len - i]?.flow_usd);
-      if (!isNaN(v)) etfFlow3d.push(v);
+    // 确定起始位置：如果最新一天为 0（周末/无数据），从倒数第二天开始
+    const lastFlow = Number(json.data[len - 1]?.flow_usd);
+    const startIdx = (lastFlow === 0 || isNaN(lastFlow)) ? len - 2 : len - 1;
+
+    // 从起始位置往前取 6 天
+    const etfFlowDays: number[] = [];
+    for (let i = startIdx; i > startIdx - 6 && i >= 0; i--) {
+      const v = Number(json.data[i]?.flow_usd);
+      if (!isNaN(v)) etfFlowDays.push(v);
     }
 
-    console.log(`[CoinGlass] ETF Flow = $${(flowUsd / 1e6).toFixed(1)}M (3日: ${etfFlow3d.map(v => `$${(v / 1e6).toFixed(1)}M`).join(", ")})`);
-    return { etfFlowUsd: flowUsd, etfFlow3d };
+    const etfFlowUsd = etfFlowDays.length > 0 ? etfFlowDays[0] : null;
+    if (etfFlowUsd === null) return { etfFlowUsd: null, etfFlowDays: [] };
+
+    console.log(`[CoinGlass] ETF Flow = $${(etfFlowUsd / 1e6).toFixed(1)}M (${etfFlowDays.length}日: ${etfFlowDays.map(v => `$${(v / 1e6).toFixed(1)}M`).join(", ")})`);
+    return { etfFlowUsd, etfFlowDays };
   } catch (err) {
     console.error(`[CoinGlass] 获取 ETF Flow 出错:`, err);
-    return { etfFlowUsd: null, etfFlow3d: [] };
+    return { etfFlowUsd: null, etfFlowDays: [] };
   }
 }
 
@@ -276,6 +281,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   ma365Price: number | null;
   ma365Ratio: number | null;
   etfFlowUsd: number | null;
+  etfFlowDays: number[];
   fundingRate: number | null;
   longShortRatio: number | null;
 }> {
@@ -293,7 +299,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
       fetchLongShortRatio(apiKey),
     ]);
 
-  const { etfFlowUsd } = etfFlowData;
+  const { etfFlowUsd, etfFlowDays } = etfFlowData;
 
   // --- STH-SOPR ---
   // 字段: sth_sopr
@@ -372,7 +378,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data, etfFlowUsd, fundingRate, longShortRatio };
+  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio };
 }
 
 /** 获取 BTC 技术指标 */
@@ -391,6 +397,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     ma365Price: null,
     ma365Ratio: null,
     etfFlowUsd: null,
+    etfFlowDays: [],
     fundingRate: null,
     longShortRatio: null,
   };
@@ -418,6 +425,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
             ma365Price: null,
             ma365Ratio: null,
             etfFlowUsd: null,
+            etfFlowDays: [] as number[],
             fundingRate: null,
             longShortRatio: null,
           }),

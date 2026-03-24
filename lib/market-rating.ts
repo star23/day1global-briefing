@@ -190,23 +190,29 @@ export function calculateMarketRating(
       category: cfg.category,
     });
 
-    // 只有有数据的指标才参与加权
-    if (score >= 0) {
-      totalWeightedScore += score * cfg.weight;
-      totalWeight += cfg.weight;
-      if (cfg.group === "daily") {
-        dailyWeightedScore += score * cfg.weight;
-        dailyWeight += cfg.weight;
-      } else {
-        weeklyWeightedScore += score * cfg.weight;
-        weeklyWeight += cfg.weight;
-      }
+    // 有数据用实际分数，无数据用中性分50
+    const effectiveScore = score >= 0 ? score : 50;
+    totalWeightedScore += effectiveScore * cfg.weight;
+    totalWeight += cfg.weight;
+    if (cfg.group === "daily") {
+      dailyWeightedScore += effectiveScore * cfg.weight;
+      dailyWeight += cfg.weight;
+    } else {
+      weeklyWeightedScore += effectiveScore * cfg.weight;
+      weeklyWeight += cfg.weight;
     }
   }
 
-  const totalScore = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 50;
-  const dailyScore = dailyWeight > 0 ? Math.round(dailyWeightedScore / dailyWeight) : 50;
-  const weeklyScore = weeklyWeight > 0 ? Math.round(weeklyWeightedScore / weeklyWeight) : 50;
+  // 每个指标得分 0-100, 乘以权重后除以 100 得到该指标的实际贡献分
+  // 例: ETF(score=60, weight=12) → 贡献 60*12/100 = 7.2 分
+  // 每日总分上限 = 32, 每周总分上限 = 68, 合计 100
+  const dailyScore = dailyWeight > 0
+    ? Math.round((dailyWeightedScore / 100) * 10) / 10
+    : 16;
+  const weeklyScore = weeklyWeight > 0
+    ? Math.round((weeklyWeightedScore / 100) * 10) / 10
+    : 34;
+  const totalScore = Math.round((dailyScore + weeklyScore) * 10) / 10;
 
   // 根据得分确定评级标签和建议
   let level: string;
