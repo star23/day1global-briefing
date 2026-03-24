@@ -101,6 +101,7 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   HOOD: { name: "Robinhood", note: "加密+零售交易平台" },
   COIN: { name: "Coinbase", note: "加密交易所龙头" },
   TEM: { name: "Tempus AI", note: "AI医疗诊断平台，精准医疗赛道" },
+  GLD: { name: "SPDR黄金ETF", note: "全球最大黄金ETF，避险核心配置" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {

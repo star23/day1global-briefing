@@ -100,7 +100,7 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 每个标的用「▸ 标的名」开头，写1-2句话总结最新进展和值得关注的信号。如果某个标的没有搜到相关新闻，也要列出并写"暂无最新进展"。整体控制在 500 字以内。）
 
 ===美股标的动态===
-（基于【美股标的相关新闻】，逐一分析每个持仓美股标的的最新动态。必须覆盖以下所有标的：NVDA、TSLA、GOOG、RKLB、CRCL、HOOD、COIN、TEM (Tempus AI)、Stripe。
+（基于【美股标的相关新闻】，逐一分析每个持仓美股标的的最新动态。必须覆盖以下所有标的：NVDA、TSLA、GOOG、RKLB、CRCL、HOOD、COIN、TEM (Tempus AI)、GLD (SPDR黄金ETF)、Stripe。
 每个标的用「▸ 标的名」开头，写1-2句话总结最新进展和值得关注的信号。如果某个标的没有搜到相关新闻，也要列出并写"暂无最新进展"。整体控制在 500 字以内。）
 
 ===今日必看===

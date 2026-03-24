@@ -5,7 +5,7 @@
 import { StockData, IndexData } from "./types";
 
 // 需要获取的美股标的列表
-const STOCK_SYMBOLS = ["VOO", "QQQM", "NVDA", "TSLA", "GOOG", "RKLB", "CRCL", "HOOD", "COIN", "TEM"];
+const STOCK_SYMBOLS = ["VOO", "QQQM", "NVDA", "TSLA", "GOOG", "RKLB", "CRCL", "HOOD", "COIN", "TEM", "GLD"];
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
