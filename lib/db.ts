@@ -20,9 +20,30 @@ export async function ensureTable() {
       wma200_price NUMERIC,
       wma200_multiplier NUMERIC,
       fear_greed INTEGER,
+      nupl       NUMERIC,
+      lth_mvrv   NUMERIC,
+      ma365_price NUMERIC,
+      ma365_ratio NUMERIC,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+}
+
+/** 为已有表添加新列 (幂等，忽略 already exists 错误) */
+export async function migrateAddColumns() {
+  const newCols = [
+    { name: "nupl", type: "NUMERIC" },
+    { name: "lth_mvrv", type: "NUMERIC" },
+    { name: "ma365_price", type: "NUMERIC" },
+    { name: "ma365_ratio", type: "NUMERIC" },
+  ];
+  for (const col of newCols) {
+    try {
+      await sql.query(`ALTER TABLE btc_metrics_daily ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    } catch {
+      // column already exists — safe to ignore
+    }
+  }
 }
 
 /** 写入当日指标 (UPSERT: 同一天只保留最新一条) */
@@ -38,14 +59,20 @@ export async function upsertDailyMetrics(row: {
   wma200Price: number | null;
   wma200Multiplier: number | null;
   fearGreed: number | null;
+  nupl: number | null;
+  lthMvrv: number | null;
+  ma365Price: number | null;
+  ma365Ratio: number | null;
 }) {
   await sql`
     INSERT INTO btc_metrics_daily
       (date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
-       sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed)
+       sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed,
+       nupl, lth_mvrv, ma365_price, ma365_ratio)
     VALUES
       (${row.date}, ${row.btcPrice}, ${row.weeklyRsi}, ${row.volume24h}, ${row.volumeChangePct},
-       ${row.sthSopr}, ${row.lthSopr}, ${row.lthSupplyPct}, ${row.wma200Price}, ${row.wma200Multiplier}, ${row.fearGreed})
+       ${row.sthSopr}, ${row.lthSopr}, ${row.lthSupplyPct}, ${row.wma200Price}, ${row.wma200Multiplier}, ${row.fearGreed},
+       ${row.nupl}, ${row.lthMvrv}, ${row.ma365Price}, ${row.ma365Ratio})
     ON CONFLICT (date) DO UPDATE SET
       btc_price         = EXCLUDED.btc_price,
       weekly_rsi        = EXCLUDED.weekly_rsi,
@@ -57,6 +84,10 @@ export async function upsertDailyMetrics(row: {
       wma200_price      = EXCLUDED.wma200_price,
       wma200_multiplier = EXCLUDED.wma200_multiplier,
       fear_greed        = EXCLUDED.fear_greed,
+      nupl              = EXCLUDED.nupl,
+      lth_mvrv          = EXCLUDED.lth_mvrv,
+      ma365_price       = EXCLUDED.ma365_price,
+      ma365_ratio       = EXCLUDED.ma365_ratio,
       created_at        = NOW()
   `;
 }
@@ -107,7 +138,8 @@ export async function getComparisonMetrics() {
         ON m.date <= t.target
     )
     SELECT label, id, date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
-           sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed, created_at
+           sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed,
+           nupl, lth_mvrv, ma365_price, ma365_ratio, created_at
     FROM ranked
     WHERE rn = 1
   `;

@@ -889,6 +889,9 @@ function HistoryComparisonCard({
     { name: "恐慌贪婪", currentVal: currentFearGreed, snapshotKey: "fearGreed", format: (v) => String(Math.round(v)), inverted: true },
     { name: "LTH 占比", currentVal: currentMetrics?.lthSupplyPercent, snapshotKey: "lthSupplyPct", format: (v) => `${v.toFixed(1)}%` },
     { name: "200WMA 倍数", currentVal: currentMetrics?.wma200Multiplier, snapshotKey: "wma200Multiplier", format: (v) => `${v.toFixed(2)}x` },
+    { name: "NUPL", currentVal: currentMetrics?.nupl, snapshotKey: "nupl", format: (v) => v.toFixed(3) },
+    { name: "LTH-MVRV", currentVal: currentMetrics?.lthMvrv, snapshotKey: "lthMvrv", format: (v) => v.toFixed(2) },
+    { name: "365日均线倍数", currentVal: currentMetrics?.ma365Ratio, snapshotKey: "ma365Ratio", format: (v) => `${v.toFixed(2)}x` },
   ];
 
   const hasHistory = history && (history.yesterday || history.oneWeek || history.oneMonth);
