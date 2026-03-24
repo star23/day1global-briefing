@@ -135,6 +135,33 @@ function Badge({ color, children }: { color: string; children: ReactNode }) {
   );
 }
 
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 16,
+        height: 16,
+        borderRadius: "50%",
+        background: COLORS.muted + "33",
+        color: COLORS.muted,
+        fontSize: 10,
+        fontWeight: 700,
+        cursor: "help",
+        marginLeft: 4,
+        verticalAlign: "middle",
+        flexShrink: 0,
+      }}
+      title={text}
+    >
+      i
+    </span>
+  );
+}
+
 function Card({
   title,
   icon,
@@ -1009,11 +1036,67 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     ? (wma200 < 1.2 ? COLORS.green : wma200 < 2.0 ? COLORS.muted : wma200 < 3.5 ? COLORS.yellow : COLORS.red)
     : COLORS.muted;
 
+  // NUPL（全网未实现净盈亏比率）
+  const nuplVal = metrics?.nupl;
+  const nuplDisplay = has(nuplVal) ? nuplVal.toFixed(3) : "数据暂不可用";
+  const nuplSignal = has(nuplVal)
+    ? (nuplVal < 0 ? "全网亏损——投降/底部区域" : nuplVal < 0.25 ? "希望/恐惧——早期复苏" : nuplVal < 0.5 ? "乐观——牛市中段" : nuplVal < 0.75 ? "贪婪——注意风险" : "极度贪婪——周期顶部信号")
+    : "等待CoinGlass数据";
+  const nuplBadge = has(nuplVal)
+    ? (nuplVal < 0 ? "🟢🟢 底部" : nuplVal < 0.25 ? "🟢 关注" : nuplVal < 0.5 ? "⚪ 中性" : nuplVal < 0.75 ? "🟡 贪婪" : "🔴 顶部")
+    : "⚪ 待接入";
+  const nuplColor = has(nuplVal)
+    ? (nuplVal < 0 ? COLORS.green : nuplVal < 0.25 ? COLORS.green : nuplVal < 0.5 ? COLORS.muted : nuplVal < 0.75 ? COLORS.yellow : COLORS.red)
+    : COLORS.muted;
+
+  // LTH-MVRV（长期持有者市场价值/已实现价值）
+  const lthMvrv = metrics?.lthMvrv;
+  const lthMvrvDisplay = has(lthMvrv) ? lthMvrv.toFixed(2) : "数据暂不可用";
+  const lthMvrvSignal = has(lthMvrv)
+    ? (lthMvrv < 1.0 ? "LTH整体浮亏——历史级底部！" : lthMvrv < 1.5 ? "LTH微利——底部区域" : lthMvrv < 3.5 ? "LTH正常盈利" : lthMvrv < 5.0 ? "LTH大幅盈利——接近顶部" : "LTH极端盈利——强烈见顶")
+    : "等待CoinGlass数据";
+  const lthMvrvBadge = has(lthMvrv)
+    ? (lthMvrv < 1.0 ? "🟢🟢 历史底" : lthMvrv < 1.5 ? "🟢 底部" : lthMvrv < 3.5 ? "⚪ 中性" : lthMvrv < 5.0 ? "🟡 见顶" : "🔴 顶部")
+    : "⚪ 待接入";
+  const lthMvrvColor = has(lthMvrv)
+    ? (lthMvrv < 1.5 ? COLORS.green : lthMvrv < 3.5 ? COLORS.muted : lthMvrv < 5.0 ? COLORS.yellow : COLORS.red)
+    : COLORS.muted;
+
+  // BTC 365日均线
+  const ma365 = metrics?.ma365Ratio;
+  const ma365Price = metrics?.ma365Price;
+  const ma365Display = has(ma365) ? `${ma365.toFixed(2)}x` : "数据暂不可用";
+  const ma365Signal = has(ma365)
+    ? (ma365 < 1.0 ? "低于365日均线——偏空/底部区域" : ma365 < 1.1 ? "接近365日均线支撑" : ma365 < 1.5 ? "正常上涨趋势" : "大幅偏离均线——过热")
+    : "等待CoinGlass数据";
+  const ma365Badge = has(ma365)
+    ? (ma365 < 1.0 ? "🟢 抄底" : ma365 < 1.1 ? "🟢 关注" : ma365 < 1.5 ? "⚪ 正常" : "🟡 过热")
+    : "⚪ 待接入";
+  const ma365Color = has(ma365)
+    ? (ma365 < 1.1 ? COLORS.green : ma365 < 1.5 ? COLORS.muted : COLORS.yellow)
+    : COLORS.muted;
+
+  // 指标解释 tooltips
+  const INDICATOR_TOOLTIPS: Record<string, string> = {
+    "周线RSI": "相对强弱指数(RSI)：衡量BTC周线级别超买/超卖程度。<30为超跌区域（历史底部信号），>70为超买。",
+    "成交量变化": "24小时成交量与30日平均成交量的偏离度。成交量极度萎缩（<-50%）通常意味着卖盘枯竭，是底部特征。",
+    "STH-SOPR": "短期持有者已实现利润率(Short-Term Holder SOPR)：短期持有者（<155天）花费的币的盈亏比。<1表示短期持有者在亏损卖出。",
+    "LTH-SOPR": "长期持有者已实现利润率(Long-Term Holder SOPR)：长期持有者（>155天）当天实际花费的币的盈亏比。<1表示长期持有者在亏损卖出，是极强底部信号。",
+    "恐惧贪婪指数": "加密市场恐惧贪婪指数(0-100)：综合波动率、交易量、社交媒体、调查等维度。≤25为极度恐惧，历史上是较好的中长期买入点。",
+    "LTH持有者": "长期持有者供应占比：持币超过155天的地址持有的BTC占流通量的比例。>70%说明长期持有者信心强，筹码集中。",
+    "NUPL": "全网未实现净盈亏比率(Net Unrealized Profit/Loss)：=(市值-已实现市值)/市值。<0为全网亏损（底部），>0.75为极度贪婪（顶部）。",
+    "LTH-MVRV": "长期持有者市场价值/已实现价值(LTH Market Value to Realized Value)：衡量长期持有者整体浮盈水平。<1为浮亏（底部），>3.5为大幅浮盈（接近顶部）。",
+    "365日均线": "BTC 365日移动平均线：长期趋势指标。价格/均线比值<1.0表示低于年线（偏空），>1.5表示大幅偏离（过热）。",
+  };
+
   const btcIndicators = [
     { name: "周线RSI", val: rsiVal, signal: rsiSignal, badge: rsiBadge, color: rsiColor },
     { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor },
     { name: "STH-SOPR", val: sthSoprVal, signal: sthSoprSignal, badge: sthSoprBadge, color: sthSoprColor },
     { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor },
+    { name: "NUPL", val: nuplDisplay, signal: nuplSignal, badge: nuplBadge, color: nuplColor },
+    { name: "LTH-MVRV", val: lthMvrvDisplay, signal: lthMvrvSignal, badge: lthMvrvBadge, color: lthMvrvColor },
+    { name: "365日均线", val: ma365Display, signal: ma365Signal, badge: ma365Badge, color: ma365Color },
     { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted },
     { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor },
   ];
@@ -1065,6 +1148,29 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     else if (lth > 60) scores.push(50);
     else scores.push(30);
   }
+  // NUPL 评分
+  if (has(nuplVal)) {
+    if (nuplVal < 0) scores.push(100);
+    else if (nuplVal < 0.25) scores.push(70);
+    else if (nuplVal < 0.5) scores.push(40);
+    else if (nuplVal < 0.75) scores.push(15);
+    else scores.push(0);
+  }
+  // LTH-MVRV 评分
+  if (has(lthMvrv)) {
+    if (lthMvrv < 1.0) scores.push(100);
+    else if (lthMvrv < 1.5) scores.push(80);
+    else if (lthMvrv < 3.5) scores.push(40);
+    else if (lthMvrv < 5.0) scores.push(15);
+    else scores.push(0);
+  }
+  // 365日均线 评分
+  if (has(ma365)) {
+    if (ma365 < 1.0) scores.push(90);
+    else if (ma365 < 1.1) scores.push(70);
+    else if (ma365 < 1.5) scores.push(40);
+    else scores.push(10);
+  }
   const avgScore = scores.length > 0
     ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : 0;
@@ -1100,7 +1206,12 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
           <tbody>
             {btcIndicators.map((r) => (
               <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
-                <td style={{ padding: "8px 6px", fontWeight: 600, color: COLORS.text }}>{r.name}</td>
+                <td style={{ padding: "8px 6px", fontWeight: 600, color: COLORS.text }}>
+                  <span style={{ display: "inline-flex", alignItems: "center" }}>
+                    {r.name}
+                    {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
+                  </span>
+                </td>
                 <td style={{ padding: "8px 6px", color: COLORS.muted }}>{r.val}</td>
                 <td style={{ padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>{r.signal}</td>
                 <td style={{ padding: "8px 6px" }}><Badge color={r.color}>{r.badge}</Badge></td>
