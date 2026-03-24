@@ -2,7 +2,7 @@
 // ========== 每日投资情报仪表板 ==========
 // 标签页：总览、流动性、市场情绪、BTC底部、持仓、新闻
 
-import { useState, ReactNode } from "react";
+import { useState, useEffect, useRef, ReactNode } from "react";
 import useSWR from "swr";
 import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem, MetricsHistoryResponse, MetricsSnapshot, MarketRating } from "@/lib/types";
 import { calculateMarketRating } from "@/lib/market-rating";
@@ -137,28 +137,70 @@ function Badge({ color, children }: { color: string; children: ReactNode }) {
 }
 
 function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [open]);
+
   return (
-    <span
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 16,
-        height: 16,
-        borderRadius: "50%",
-        background: COLORS.muted + "33",
-        color: COLORS.muted,
-        fontSize: 10,
-        fontWeight: 700,
-        cursor: "help",
-        marginLeft: 4,
-        verticalAlign: "middle",
-        flexShrink: 0,
-      }}
-      title={text}
-    >
-      i
+    <span ref={ref} style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+      <span
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: open ? COLORS.accent + "44" : COLORS.muted + "33",
+          color: open ? COLORS.accent : COLORS.muted,
+          fontSize: 10,
+          fontWeight: 700,
+          cursor: "pointer",
+          marginLeft: 4,
+          verticalAlign: "middle",
+        }}
+      >
+        i
+      </span>
+      {open && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 6px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: COLORS.card,
+            border: `1px solid ${COLORS.cardBorder}`,
+            borderRadius: 8,
+            padding: "8px 10px",
+            fontSize: 11,
+            lineHeight: 1.5,
+            color: COLORS.text,
+            whiteSpace: "pre-line",
+            zIndex: 100,
+            minWidth: 200,
+            maxWidth: 280,
+            boxShadow: `0 4px 12px ${COLORS.bg}aa`,
+          }}
+        >
+          {text}
+        </span>
+      )}
     </span>
   );
 }
