@@ -3,7 +3,7 @@
 // GET /api/init-db?secret=YOUR_CRON_SECRET
 
 import { NextRequest, NextResponse } from "next/server";
-import { ensureTable } from "@/lib/db";
+import { ensureTable, migrateAddColumns } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get("secret");
@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
 
   try {
     await ensureTable();
-    return NextResponse.json({ success: true, message: "表已创建/已存在" });
+    await migrateAddColumns();
+    return NextResponse.json({ success: true, message: "表已创建/已存在，列迁移完成" });
   } catch (err) {
     console.error("[InitDB] 建表失败:", err);
     return NextResponse.json(
