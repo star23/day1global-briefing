@@ -112,7 +112,7 @@ async function fetchCoinGlassLatest(
  * 从 CoinGlass 获取 BTC 365日均线
  * 使用 futures/indicators/ma 端点
  */
-async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | null; ma365Ratio: number | null }> {
+async function fetchBTC365MA(apiKey: string): Promise<number | null> {
   try {
     const res = await fetch(
       `${COINGLASS_BASE}/api/futures/indicators/ma?exchange=Binance&symbol=BTCUSDT&interval=365d`,
@@ -123,28 +123,26 @@ async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | nul
     );
     if (!res.ok) {
       console.error(`[CoinGlass] BTC 365MA 请求失败: ${res.status}`);
-      return { ma365Price: null, ma365Ratio: null };
+      return null;
     }
     const json = await res.json();
     if (json.code !== "0" || !json.data) {
       console.error(`[CoinGlass] BTC 365MA 数据异常:`, json.msg || "无数据");
-      return { ma365Price: null, ma365Ratio: null };
+      return null;
     }
-    // data 可能是对象或数组，取最新条目中的 ma 和 price
+    // 返回格式: { time, ma_value }（对象或数组）
     const entry = Array.isArray(json.data)
       ? json.data[json.data.length - 1]
       : json.data;
-    const ma = Number(entry?.ma ?? entry?.moving_average ?? entry?.value);
-    const price = Number(entry?.price ?? entry?.close);
+    const ma = Number(entry?.ma_value);
     if (!isNaN(ma) && ma > 0) {
-      const ratio = !isNaN(price) && price > 0 ? Math.round((price / ma) * 100) / 100 : null;
-      console.log(`[CoinGlass] BTC 365MA = $${Math.round(ma).toLocaleString()}, Price = $${Math.round(price).toLocaleString()}, Ratio = ${ratio}`);
-      return { ma365Price: Math.round(ma), ma365Ratio: ratio };
+      console.log(`[CoinGlass] BTC 365MA = $${Math.round(ma).toLocaleString()}`);
+      return Math.round(ma);
     }
-    return { ma365Price: null, ma365Ratio: null };
+    return null;
   } catch (err) {
     console.error(`[CoinGlass] 获取 BTC 365MA 出错:`, err);
-    return { ma365Price: null, ma365Ratio: null };
+    return null;
   }
 }
 
@@ -159,7 +157,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   ma365Price: number | null;
   ma365Ratio: number | null;
 }> {
-  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthMvrvData, ma365Data] =
+  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthMvrvData, ma365Price] =
     await Promise.all([
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-sopr", "LTH-SOPR"),
@@ -246,7 +244,18 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data };
+  // --- BTC 365日均线 ---
+  // ma365Price 来自 fetchBTC365MA, ratio 用 200WMA 端点返回的当前价格计算
+  let ma365Ratio: number | null = null;
+  if (ma365Price != null) {
+    const btcPrice = wma200Data ? Number(wma200Data.price) : NaN;
+    if (!isNaN(btcPrice) && btcPrice > 0) {
+      ma365Ratio = Math.round((btcPrice / ma365Price) * 100) / 100;
+      console.log(`[CoinGlass] BTC 365MA Ratio = ${ma365Ratio} (Price $${Math.round(btcPrice).toLocaleString()} / MA $${ma365Price.toLocaleString()})`);
+    }
+  }
+
+  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ma365Price, ma365Ratio };
 }
 
 /** 获取 BTC 技术指标 */
