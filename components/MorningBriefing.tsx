@@ -169,7 +169,7 @@ function Card({
   children,
   accent = COLORS.accent,
 }: {
-  title?: string;
+  title?: ReactNode;
   icon?: string;
   children: ReactNode;
   accent?: string;
@@ -1095,15 +1095,16 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   // Funding Rate
   const fundingRate = metrics?.fundingRate;
-  const fundingRateVal = has(fundingRate) ? `${(fundingRate * 100).toFixed(4)}%` : "数据暂不可用";
+  // fundingRate 的值已经是百分比数字，如 0.01 表示 0.01%
+  const fundingRateVal = has(fundingRate) ? `${fundingRate}%` : "数据暂不可用";
   const fundingRateSignal = has(fundingRate)
-    ? (fundingRate > 0.001 ? "资金费率极高——多头拥挤" : fundingRate > 0.0003 ? "偏多" : fundingRate > -0.0003 ? "中性" : fundingRate > -0.001 ? "偏空" : "资金费率极低——空头拥挤")
+    ? (fundingRate > 0.1 ? "资金费率极高——多头拥挤" : fundingRate > 0.03 ? "偏多" : fundingRate > -0.03 ? "中性" : fundingRate > -0.1 ? "偏空" : "资金费率极低——空头拥挤")
     : "等待CoinGlass数据";
   const fundingRateBadge = has(fundingRate)
-    ? (fundingRate > 0.001 ? "🔴 过热" : fundingRate > 0.0003 ? "🟡 偏热" : fundingRate > -0.0003 ? "⚪ 中性" : fundingRate > -0.001 ? "🟢 偏冷" : "🟢🟢 恐慌")
+    ? (fundingRate > 0.1 ? "🔴 过热" : fundingRate > 0.03 ? "🟡 偏热" : fundingRate > -0.03 ? "⚪ 中性" : fundingRate > -0.1 ? "🟢 偏冷" : "🟢🟢 恐慌")
     : "⚪ 待接入";
   const fundingRateColor = has(fundingRate)
-    ? (fundingRate > 0.001 ? COLORS.red : fundingRate > 0.0003 ? COLORS.yellow : fundingRate < -0.001 ? COLORS.green : fundingRate < -0.0003 ? COLORS.green : COLORS.muted)
+    ? (fundingRate > 0.1 ? COLORS.red : fundingRate > 0.03 ? COLORS.yellow : fundingRate < -0.1 ? COLORS.green : fundingRate < -0.03 ? COLORS.green : COLORS.muted)
     : COLORS.muted;
 
   // 多空比
@@ -1174,7 +1175,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   return (
     <>
-      <Card title="🔍 比特币抄底/逃顶分析" icon="" accent={COLORS.orange}>
+      <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>🔍 比特币抄底/逃顶分析<InfoTooltip text={`权重分配：\n每日(32)：ETF净流入:12 | Funding Rate:8 | 多空比:5 | 恐惧贪婪:7\n每周(68)：LTH-MVRV:10 | NUPL:9 | LTH-SOPR:8 | STH-SOPR:7 | LTH持有者:6 | 365日均线:6 | 200周均线:6 | 周线RSI:5 | 成交量:3`} /></span>} icon="" accent={COLORS.orange}>
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: COLORS.muted }}>BTC 当前价格</span>
           {btc ? (
@@ -1196,7 +1197,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
-              {["指标", "权重", "当前", "信号", "状态"].map((h) => (
+              {["指标", "当前", "信号", "状态"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{h}</th>
               ))}
             </tr>
@@ -1210,7 +1211,6 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
                     {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
                   </span>
                 </td>
-                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.weight}</td>
                 <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
                 <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.signal}</td>
                 <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
@@ -1224,7 +1224,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
-              {["指标", "权重", "当前", "信号", "状态"].map((h) => (
+              {["指标", "当前", "信号", "状态"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{h}</th>
               ))}
             </tr>
@@ -1238,7 +1238,6 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
                     {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
                   </span>
                 </td>
-                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.weight}</td>
                 <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
                 <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.signal}</td>
                 <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
