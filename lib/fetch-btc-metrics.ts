@@ -11,6 +11,10 @@ export interface BTCMetrics {
   lthSupplyPercent: number | null;    // 长期持有者供应占比（%）
   wma200Price: number | null;         // 200 周均线价格
   wma200Multiplier: number | null;    // 当前价格 / 200WMA 倍数
+  nupl: number | null;                // NUPL 全网未实现净盈亏比率
+  lthMvrv: number | null;             // LTH-MVRV 长期持有者市场价值/已实现价值
+  ma365Price: number | null;          // BTC 365日均线价格
+  ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
 }
 
 // BTC 大致流通量（约 19.85M，每天增加约 450 BTC，误差 <0.1%）
@@ -104,19 +108,66 @@ async function fetchCoinGlassLatest(
  *   bitcoin-long-term-holder-supply → { timestamp, price, long_term_holder_supply }
  *   200-week-moving-average-heatmap → { timestamp, price, moving_average_1440, moving_average_1440_ip }
  */
+/**
+ * 从 CoinGlass 获取 BTC 365日均线
+ * 使用 futures/indicators/ma 端点
+ */
+async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | null; ma365Ratio: number | null }> {
+  try {
+    const res = await fetch(
+      `${COINGLASS_BASE}/api/futures/indicators/ma?exchange=Binance&symbol=BTCUSDT&interval=365d`,
+      {
+        cache: "no-store",
+        headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+      }
+    );
+    if (!res.ok) {
+      console.error(`[CoinGlass] BTC 365MA 请求失败: ${res.status}`);
+      return { ma365Price: null, ma365Ratio: null };
+    }
+    const json = await res.json();
+    if (json.code !== "0" || !json.data) {
+      console.error(`[CoinGlass] BTC 365MA 数据异常:`, json.msg || "无数据");
+      return { ma365Price: null, ma365Ratio: null };
+    }
+    // data 可能是对象或数组，取最新条目中的 ma 和 price
+    const entry = Array.isArray(json.data)
+      ? json.data[json.data.length - 1]
+      : json.data;
+    const ma = Number(entry?.ma ?? entry?.moving_average ?? entry?.value);
+    const price = Number(entry?.price ?? entry?.close);
+    if (!isNaN(ma) && ma > 0) {
+      const ratio = !isNaN(price) && price > 0 ? Math.round((price / ma) * 100) / 100 : null;
+      console.log(`[CoinGlass] BTC 365MA = $${Math.round(ma).toLocaleString()}, Price = $${Math.round(price).toLocaleString()}, Ratio = ${ratio}`);
+      return { ma365Price: Math.round(ma), ma365Ratio: ratio };
+    }
+    return { ma365Price: null, ma365Ratio: null };
+  } catch (err) {
+    console.error(`[CoinGlass] 获取 BTC 365MA 出错:`, err);
+    return { ma365Price: null, ma365Ratio: null };
+  }
+}
+
 async function fetchOnChainMetrics(apiKey: string): Promise<{
   sthSopr: number | null;
   lthSopr: number | null;
   lthSupplyPercent: number | null;
   wma200Price: number | null;
   wma200Multiplier: number | null;
+  nupl: number | null;
+  lthMvrv: number | null;
+  ma365Price: number | null;
+  ma365Ratio: number | null;
 }> {
-  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data] =
+  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthMvrvData, ma365Data] =
     await Promise.all([
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-sopr", "LTH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-long-term-holder-supply", "LTH Supply"),
       fetchCoinGlassLatest(apiKey, "200-week-moving-average-heatmap", "200WMA"),
+      fetchCoinGlassLatest(apiKey, "bitcoin-net-unrealized-profit-loss", "NUPL"),
+      fetchCoinGlassLatest(apiKey, "bitcoin-lth-mvrv", "LTH-MVRV"),
+      fetchBTC365MA(apiKey),
     ]);
 
   // --- STH-SOPR ---
@@ -173,7 +224,29 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier };
+  // --- NUPL ---
+  // 字段: nupl 或 net_unrealized_profit_loss
+  let nupl: number | null = null;
+  if (nuplData) {
+    const v = Number(nuplData.nupl ?? nuplData.net_unrealized_profit_loss ?? nuplData.value);
+    if (!isNaN(v)) {
+      nupl = Math.round(v * 1000) / 1000;
+      console.log(`[CoinGlass] NUPL = ${nupl}`);
+    }
+  }
+
+  // --- LTH-MVRV ---
+  // 字段: lth_mvrv
+  let lthMvrv: number | null = null;
+  if (lthMvrvData) {
+    const v = Number(lthMvrvData.lth_mvrv ?? lthMvrvData.mvrv ?? lthMvrvData.value);
+    if (!isNaN(v) && v > 0) {
+      lthMvrv = Math.round(v * 100) / 100;
+      console.log(`[CoinGlass] LTH-MVRV = ${lthMvrv}`);
+    }
+  }
+
+  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data };
 }
 
 /** 获取 BTC 技术指标 */
@@ -187,6 +260,10 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     lthSupplyPercent: null,
     wma200Price: null,
     wma200Multiplier: null,
+    nupl: null,
+    lthMvrv: null,
+    ma365Price: null,
+    ma365Ratio: null,
   };
 
   try {
@@ -207,6 +284,10 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
             lthSupplyPercent: null,
             wma200Price: null,
             wma200Multiplier: null,
+            nupl: null,
+            lthMvrv: null,
+            ma365Price: null,
+            ma365Ratio: null,
           }),
     ]);
 

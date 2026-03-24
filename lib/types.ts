@@ -40,6 +40,10 @@ export interface BTCMetrics {
   lthSupplyPercent: number | null;    // 长期持有者供应占比
   wma200Price: number | null;         // 200 周均线价格
   wma200Multiplier: number | null;    // 当前价格 / 200WMA 倍数
+  nupl: number | null;                // NUPL 全网未实现净盈亏比率
+  lthMvrv: number | null;             // LTH-MVRV 长期持有者市场价值/已实现价值
+  ma365Price: number | null;          // BTC 365日均线价格
+  ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
 }
 
 /** /api/market-data 返回的完整数据格式 */
