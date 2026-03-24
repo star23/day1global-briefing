@@ -159,9 +159,9 @@ async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | nul
 /**
  * 从 CoinGlass 获取 BTC ETF 每日净流入
  * 端点: /api/etf/bitcoin/flow-history
- * 取数组最后一条的 flow_usd
+ * 因时差取倒数第二条的 flow_usd，同时返回最近 3 日数据用于趋势判断
  */
-async function fetchETFFlow(apiKey: string): Promise<number | null> {
+async function fetchETFFlow(apiKey: string): Promise<{ etfFlowUsd: number | null; etfFlow3d: number[] }> {
   try {
     const res = await fetch(`${COINGLASS_BASE}/api/etf/bitcoin/flow-history`, {
       cache: "no-store",
@@ -169,21 +169,31 @@ async function fetchETFFlow(apiKey: string): Promise<number | null> {
     });
     if (!res.ok) {
       console.error(`[CoinGlass] ETF Flow 请求失败: ${res.status}`);
-      return null;
+      return { etfFlowUsd: null, etfFlow3d: [] };
     }
     const json = await res.json();
-    if (json.code !== "0" || !Array.isArray(json.data) || json.data.length === 0) {
+    if (json.code !== "0" || !Array.isArray(json.data) || json.data.length < 2) {
       console.error(`[CoinGlass] ETF Flow 数据异常:`, json.msg || "无数据");
-      return null;
+      return { etfFlowUsd: null, etfFlow3d: [] };
     }
-    const latest = json.data[json.data.length - 1];
+    // 因时差取倒数第二条作为"昨日"数据
+    const len = json.data.length;
+    const latest = json.data[len - 2];
     const flowUsd = Number(latest.flow_usd);
-    if (isNaN(flowUsd)) return null;
-    console.log(`[CoinGlass] ETF Flow = $${(flowUsd / 1e6).toFixed(1)}M`);
-    return flowUsd;
+    if (isNaN(flowUsd)) return { etfFlowUsd: null, etfFlow3d: [] };
+
+    // 最近 3 日: 倒数第 2、3、4 条
+    const etfFlow3d: number[] = [];
+    for (let i = 2; i <= 4 && i <= len; i++) {
+      const v = Number(json.data[len - i]?.flow_usd);
+      if (!isNaN(v)) etfFlow3d.push(v);
+    }
+
+    console.log(`[CoinGlass] ETF Flow = $${(flowUsd / 1e6).toFixed(1)}M (3日: ${etfFlow3d.map(v => `$${(v / 1e6).toFixed(1)}M`).join(", ")})`);
+    return { etfFlowUsd: flowUsd, etfFlow3d };
   } catch (err) {
     console.error(`[CoinGlass] 获取 ETF Flow 出错:`, err);
-    return null;
+    return { etfFlowUsd: null, etfFlow3d: [] };
   }
 }
 
@@ -213,7 +223,7 @@ async function fetchFundingRate(apiKey: string): Promise<number | null> {
     const latest = json.data[json.data.length - 1];
     const close = Number(latest.close);
     if (isNaN(close)) return null;
-    console.log(`[CoinGlass] Funding Rate = ${(close * 100).toFixed(4)}%`);
+    console.log(`[CoinGlass] Funding Rate = ${close}%`);
     return close;
   } catch (err) {
     console.error(`[CoinGlass] 获取 Funding Rate 出错:`, err);
@@ -229,7 +239,7 @@ async function fetchFundingRate(apiKey: string): Promise<number | null> {
 async function fetchLongShortRatio(apiKey: string): Promise<number | null> {
   try {
     const res = await fetch(
-      `${COINGLASS_BASE}/api/futures/global-long-short-account-ratio/history`,
+      `${COINGLASS_BASE}/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=24h`,
       {
         cache: "no-store",
         headers: { "CG-API-KEY": apiKey, accept: "application/json" },
@@ -269,7 +279,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   fundingRate: number | null;
   longShortRatio: number | null;
 }> {
-  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowUsd, fundingRate, longShortRatio] =
+  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowData, fundingRate, longShortRatio] =
     await Promise.all([
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-sopr", "LTH-SOPR"),
@@ -282,6 +292,8 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
       fetchFundingRate(apiKey),
       fetchLongShortRatio(apiKey),
     ]);
+
+  const { etfFlowUsd } = etfFlowData;
 
   // --- STH-SOPR ---
   // 字段: sth_sopr
