@@ -69,6 +69,9 @@ export async function GET(request: NextRequest) {
         lthMvrv: data.btcMetrics?.lthMvrv ?? null,
         ma365Price: data.btcMetrics?.ma365Price ?? null,
         ma365Ratio: data.btcMetrics?.ma365Ratio ?? null,
+        etfFlowUsd: data.btcMetrics?.etfFlowUsd ?? null,
+        fundingRate: data.btcMetrics?.fundingRate ?? null,
+        longShortRatio: data.btcMetrics?.longShortRatio ?? null,
       });
       metricsStored = true;
       console.log(`[Cron] BTC 指标已写入 Postgres (${today})`);

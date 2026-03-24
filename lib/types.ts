@@ -44,6 +44,9 @@ export interface BTCMetrics {
   lthMvrv: number | null;             // LTH-MVRV 长期持有者市场价值/已实现价值
   ma365Price: number | null;          // BTC 365日均线价格
   ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
+  etfFlowUsd: number | null;          // BTC ETF 每日净流入（美元）
+  fundingRate: number | null;         // BTC 资金费率（Binance 8h）
+  longShortRatio: number | null;      // 全球多空账户比
 }
 
 /** /api/market-data 返回的完整数据格式 */
@@ -93,6 +96,31 @@ export interface MetricsSnapshot {
   lthMvrv: number | null;
   ma365Price: number | null;
   ma365Ratio: number | null;
+  etfFlowUsd: number | null;
+  fundingRate: number | null;
+  longShortRatio: number | null;
+}
+
+/**
+ * 指标评分系统 — 抄底/逃顶综合评级
+ * 每个指标有独立的权重，分为"每日关注"和"每周关注"两组
+ */
+export interface IndicatorScore {
+  name: string;           // 指标名称
+  value: number | null;   // 当前值
+  score: number;          // 标准化分数 0-100 (0=极度恐慌/抄底, 100=极度贪婪/逃顶)
+  weight: number;         // 权重
+  group: 'daily' | 'weekly'; // 分组
+  category: string;       // 子分类
+}
+
+export interface MarketRating {
+  totalScore: number;          // 加权综合得分 0-100
+  dailyScore: number;          // 每日关注得分
+  weeklyScore: number;         // 每周关注得分
+  level: string;               // 评级标签（极度恐慌/恐慌/中性/贪婪/极度贪婪）
+  suggestion: string;          // 操作建议
+  indicators: IndicatorScore[]; // 各指标明细
 }
 
 /** /api/metrics-history 返回的历史对比数据 */
