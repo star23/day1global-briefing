@@ -15,6 +15,9 @@ export interface BTCMetrics {
   lthMvrv: number | null;             // LTH-MVRV 长期持有者市场价值/已实现价值
   ma365Price: number | null;          // BTC 365日均线价格
   ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
+  etfFlowUsd: number | null;          // BTC ETF 每日净流入（美元）
+  fundingRate: number | null;         // BTC 资金费率（Binance 8h 收盘）
+  longShortRatio: number | null;      // 全球多空账户比
 }
 
 // BTC 大致流通量（约 19.85M，每天增加约 450 BTC，误差 <0.1%）
@@ -153,6 +156,105 @@ async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | nul
   }
 }
 
+/**
+ * 从 CoinGlass 获取 BTC ETF 每日净流入
+ * 端点: /api/etf/bitcoin/flow-history
+ * 取数组最后一条的 flow_usd
+ */
+async function fetchETFFlow(apiKey: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${COINGLASS_BASE}/api/etf/bitcoin/flow-history`, {
+      cache: "no-store",
+      headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+    });
+    if (!res.ok) {
+      console.error(`[CoinGlass] ETF Flow 请求失败: ${res.status}`);
+      return null;
+    }
+    const json = await res.json();
+    if (json.code !== "0" || !Array.isArray(json.data) || json.data.length === 0) {
+      console.error(`[CoinGlass] ETF Flow 数据异常:`, json.msg || "无数据");
+      return null;
+    }
+    const latest = json.data[json.data.length - 1];
+    const flowUsd = Number(latest.flow_usd);
+    if (isNaN(flowUsd)) return null;
+    console.log(`[CoinGlass] ETF Flow = $${(flowUsd / 1e6).toFixed(1)}M`);
+    return flowUsd;
+  } catch (err) {
+    console.error(`[CoinGlass] 获取 ETF Flow 出错:`, err);
+    return null;
+  }
+}
+
+/**
+ * 从 CoinGlass 获取 BTC Funding Rate (Binance 8h)
+ * 端点: /api/futures/funding-rate/history?exchange=Binance&symbol=BTCUSDT&interval=8h
+ * 取数组最后一条的 close
+ */
+async function fetchFundingRate(apiKey: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `${COINGLASS_BASE}/api/futures/funding-rate/history?exchange=Binance&symbol=BTCUSDT&interval=8h`,
+      {
+        cache: "no-store",
+        headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+      }
+    );
+    if (!res.ok) {
+      console.error(`[CoinGlass] Funding Rate 请求失败: ${res.status}`);
+      return null;
+    }
+    const json = await res.json();
+    if (json.code !== "0" || !Array.isArray(json.data) || json.data.length === 0) {
+      console.error(`[CoinGlass] Funding Rate 数据异常:`, json.msg || "无数据");
+      return null;
+    }
+    const latest = json.data[json.data.length - 1];
+    const close = Number(latest.close);
+    if (isNaN(close)) return null;
+    console.log(`[CoinGlass] Funding Rate = ${(close * 100).toFixed(4)}%`);
+    return close;
+  } catch (err) {
+    console.error(`[CoinGlass] 获取 Funding Rate 出错:`, err);
+    return null;
+  }
+}
+
+/**
+ * 从 CoinGlass 获取全球多空账户比
+ * 端点: /api/futures/global-long-short-account-ratio/history
+ * 取数组最后一条的 global_account_long_short_ratio
+ */
+async function fetchLongShortRatio(apiKey: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `${COINGLASS_BASE}/api/futures/global-long-short-account-ratio/history`,
+      {
+        cache: "no-store",
+        headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+      }
+    );
+    if (!res.ok) {
+      console.error(`[CoinGlass] Long/Short Ratio 请求失败: ${res.status}`);
+      return null;
+    }
+    const json = await res.json();
+    if (json.code !== "0" || !Array.isArray(json.data) || json.data.length === 0) {
+      console.error(`[CoinGlass] Long/Short Ratio 数据异常:`, json.msg || "无数据");
+      return null;
+    }
+    const latest = json.data[json.data.length - 1];
+    const ratio = Number(latest.global_account_long_short_ratio);
+    if (isNaN(ratio)) return null;
+    console.log(`[CoinGlass] Long/Short Ratio = ${ratio}`);
+    return ratio;
+  } catch (err) {
+    console.error(`[CoinGlass] 获取 Long/Short Ratio 出错:`, err);
+    return null;
+  }
+}
+
 async function fetchOnChainMetrics(apiKey: string): Promise<{
   sthSopr: number | null;
   lthSopr: number | null;
@@ -163,8 +265,11 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   lthMvrv: number | null;
   ma365Price: number | null;
   ma365Ratio: number | null;
+  etfFlowUsd: number | null;
+  fundingRate: number | null;
+  longShortRatio: number | null;
 }> {
-  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data] =
+  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowUsd, fundingRate, longShortRatio] =
     await Promise.all([
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-sopr", "LTH-SOPR"),
@@ -173,6 +278,9 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
       fetchCoinGlassLatest(apiKey, "bitcoin-net-unrealized-profit-loss", "NUPL"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-realized-price", "LTH Realized Price"),
       fetchBTC365MA(apiKey),
+      fetchETFFlow(apiKey),
+      fetchFundingRate(apiKey),
+      fetchLongShortRatio(apiKey),
     ]);
 
   // --- STH-SOPR ---
@@ -252,7 +360,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data };
+  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data, etfFlowUsd, fundingRate, longShortRatio };
 }
 
 /** 获取 BTC 技术指标 */
@@ -270,6 +378,9 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     lthMvrv: null,
     ma365Price: null,
     ma365Ratio: null,
+    etfFlowUsd: null,
+    fundingRate: null,
+    longShortRatio: null,
   };
 
   try {
@@ -294,6 +405,9 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
             lthMvrv: null,
             ma365Price: null,
             ma365Ratio: null,
+            etfFlowUsd: null,
+            fundingRate: null,
+            longShortRatio: null,
           }),
     ]);
 

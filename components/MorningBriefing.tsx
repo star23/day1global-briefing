@@ -4,7 +4,8 @@
 
 import { useState, ReactNode } from "react";
 import useSWR from "swr";
-import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem, MetricsHistoryResponse, MetricsSnapshot } from "@/lib/types";
+import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem, MetricsHistoryResponse, MetricsSnapshot, MarketRating } from "@/lib/types";
+import { calculateMarketRating } from "@/lib/market-rating";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -1079,8 +1080,50 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     ? (ma365 < 1.1 ? COLORS.green : ma365 < 1.5 ? COLORS.muted : COLORS.yellow)
     : COLORS.muted;
 
+  // ETF 每日净流入
+  const etfFlow = metrics?.etfFlowUsd;
+  const etfFlowVal = has(etfFlow) ? `$${(etfFlow / 1e6).toFixed(1)}M` : "数据暂不可用";
+  const etfFlowSignal = has(etfFlow)
+    ? (etfFlow > 500e6 ? "大量流入——机构看涨" : etfFlow > 100e6 ? "净流入——偏多" : etfFlow > -100e6 ? "流入流出平衡" : etfFlow > -500e6 ? "净流出——偏空" : "大量流出——机构撤退")
+    : "等待CoinGlass数据";
+  const etfFlowBadge = has(etfFlow)
+    ? (etfFlow > 500e6 ? "🔴 过热" : etfFlow > 100e6 ? "🟡 偏热" : etfFlow > -100e6 ? "⚪ 中性" : etfFlow > -500e6 ? "🟢 偏冷" : "🟢🟢 恐慌")
+    : "⚪ 待接入";
+  const etfFlowColor = has(etfFlow)
+    ? (etfFlow > 500e6 ? COLORS.red : etfFlow > 100e6 ? COLORS.yellow : etfFlow < -500e6 ? COLORS.green : etfFlow < -100e6 ? COLORS.green : COLORS.muted)
+    : COLORS.muted;
+
+  // Funding Rate
+  const fundingRate = metrics?.fundingRate;
+  const fundingRateVal = has(fundingRate) ? `${(fundingRate * 100).toFixed(4)}%` : "数据暂不可用";
+  const fundingRateSignal = has(fundingRate)
+    ? (fundingRate > 0.001 ? "资金费率极高——多头拥挤" : fundingRate > 0.0003 ? "偏多" : fundingRate > -0.0003 ? "中性" : fundingRate > -0.001 ? "偏空" : "资金费率极低——空头拥挤")
+    : "等待CoinGlass数据";
+  const fundingRateBadge = has(fundingRate)
+    ? (fundingRate > 0.001 ? "🔴 过热" : fundingRate > 0.0003 ? "🟡 偏热" : fundingRate > -0.0003 ? "⚪ 中性" : fundingRate > -0.001 ? "🟢 偏冷" : "🟢🟢 恐慌")
+    : "⚪ 待接入";
+  const fundingRateColor = has(fundingRate)
+    ? (fundingRate > 0.001 ? COLORS.red : fundingRate > 0.0003 ? COLORS.yellow : fundingRate < -0.001 ? COLORS.green : fundingRate < -0.0003 ? COLORS.green : COLORS.muted)
+    : COLORS.muted;
+
+  // 多空比
+  const longShort = metrics?.longShortRatio;
+  const longShortVal = has(longShort) ? longShort.toFixed(2) : "数据暂不可用";
+  const longShortSignal = has(longShort)
+    ? (longShort > 1.5 ? "多头大幅占优——警惕反转" : longShort > 1.2 ? "偏多" : longShort > 0.8 ? "多空均衡" : "空头占优——反弹可能")
+    : "等待CoinGlass数据";
+  const longShortBadge = has(longShort)
+    ? (longShort > 1.5 ? "🔴 过热" : longShort > 1.2 ? "🟡 偏热" : longShort > 0.8 ? "⚪ 中性" : "🟢 偏冷")
+    : "⚪ 待接入";
+  const longShortColor = has(longShort)
+    ? (longShort > 1.5 ? COLORS.red : longShort > 1.2 ? COLORS.yellow : longShort < 0.8 ? COLORS.green : COLORS.muted)
+    : COLORS.muted;
+
   // 指标解释 tooltips
   const INDICATOR_TOOLTIPS: Record<string, string> = {
+    "ETF 净流入": "BTC现货ETF每日净流入/流出（美元），反映机构资金动向。大量流入=看涨情绪浓厚，大量流出=机构撤退。",
+    "Funding Rate": "永续合约资金费率（Binance 8h）：>0多头付费给空头，<0空头付费给多头。极端正值=多头拥挤（警惕回调），负值=空头拥挤（反弹机会）。",
+    "多空比": "全球期货交易所多空账户比：>1多头账户占优，<1空头账户占优。极端值通常预示反转。",
     "周线RSI": "相对强弱指数(RSI)：衡量BTC周线级别超买/超卖程度。<30为超跌区域（历史底部信号），>70为超买。",
     "成交量变化": "24小时成交量与30日平均成交量的偏离度。成交量极度萎缩（<-50%）通常意味着卖盘枯竭，是底部特征。",
     "STH-SOPR": "短期持有者已实现利润率(Short-Term Holder SOPR)：短期持有者（<155天）花费的币的盈亏比。<1表示短期持有者在亏损卖出。",
@@ -1092,97 +1135,46 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     "365日均线": "BTC 365日移动平均线：长期趋势指标。价格/均线比值<1.0表示低于年线（偏空），>1.5表示大幅偏离（过热）。",
   };
 
-  const btcIndicators = [
-    { name: "周线RSI", val: rsiVal, signal: rsiSignal, badge: rsiBadge, color: rsiColor },
-    { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor },
-    { name: "STH-SOPR", val: sthSoprVal, signal: sthSoprSignal, badge: sthSoprBadge, color: sthSoprColor },
-    { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor },
-    { name: "NUPL", val: nuplDisplay, signal: nuplSignal, badge: nuplBadge, color: nuplColor },
-    { name: "LTH-MVRV", val: lthMvrvDisplay, signal: lthMvrvSignal, badge: lthMvrvBadge, color: lthMvrvColor },
-    { name: "365日均线", val: ma365Display, signal: ma365Signal, badge: ma365Badge, color: ma365Color },
-    { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted },
-    { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor },
+  // 每日关注指标
+  const dailyIndicators = [
+    { name: "ETF 净流入", val: etfFlowVal, signal: etfFlowSignal, badge: etfFlowBadge, color: etfFlowColor, weight: 12 },
+    { name: "Funding Rate", val: fundingRateVal, signal: fundingRateSignal, badge: fundingRateBadge, color: fundingRateColor, weight: 8 },
+    { name: "多空比", val: longShortVal, signal: longShortSignal, badge: longShortBadge, color: longShortColor, weight: 5 },
+    { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted, weight: 7 },
   ];
 
-  const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发") || i.badge.includes("强底") || i.badge.includes("历史底") || i.badge.includes("抄底") || i.badge.includes("底部")).length;
+  // 每周关注指标
+  const weeklyIndicators = [
+    { name: "LTH-MVRV", val: lthMvrvDisplay, signal: lthMvrvSignal, badge: lthMvrvBadge, color: lthMvrvColor, weight: 10 },
+    { name: "NUPL", val: nuplDisplay, signal: nuplSignal, badge: nuplBadge, color: nuplColor, weight: 9 },
+    { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor, weight: 8 },
+    { name: "STH-SOPR", val: sthSoprVal, signal: sthSoprSignal, badge: sthSoprBadge, color: sthSoprColor, weight: 7 },
+    { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor, weight: 6 },
+    { name: "365日均线", val: ma365Display, signal: ma365Signal, badge: ma365Badge, color: ma365Color, weight: 6 },
+    { name: "周线RSI", val: rsiVal, signal: rsiSignal, badge: rsiBadge, color: rsiColor, weight: 5 },
+    { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor, weight: 3 },
+  ];
+
+  const btcIndicators = [...dailyIndicators, ...weeklyIndicators];
+
+  const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发") || i.badge.includes("强底") || i.badge.includes("历史底") || i.badge.includes("抄底") || i.badge.includes("底部") || i.badge.includes("恐慌")).length;
   const topCount = btcIndicators.filter(i => i.badge.includes("谨慎") || i.badge.includes("见顶") || i.badge.includes("顶部") || i.badge.includes("过热")).length;
 
-  // --- 综合抄底评分 ---
-  const scores: number[] = [];
-  // STH-SOPR 评分
-  if (has(sthSopr)) {
-    if (sthSopr < 0.90) scores.push(100);
-    else if (sthSopr < 0.95) scores.push(80);
-    else if (sthSopr < 1.00) scores.push(60);
-    else if (sthSopr < 1.05) scores.push(30);
-    else scores.push(0);
-  }
-  // LTH-SOPR 评分
-  if (has(lthSopr)) {
-    if (lthSopr < 0.95) scores.push(100);
-    else if (lthSopr < 1.00) scores.push(80);
-    else if (lthSopr < 2.00) scores.push(50);
-    else if (lthSopr < 3.00) scores.push(20);
-    else scores.push(0);
-  }
-  // 恐慌贪婪指数评分
-  if (fearGreed <= 10) scores.push(100);
-  else if (fearGreed <= 25) scores.push(80);
-  else if (fearGreed <= 40) scores.push(50);
-  else scores.push(20);
-  // 周线 RSI 评分
-  if (has(rsi)) {
-    if (rsi < 30) scores.push(100);
-    else if (rsi < 40) scores.push(70);
-    else if (rsi < 50) scores.push(40);
-    else scores.push(10);
-  }
-  // 200WMA 评分
-  if (has(wma200)) {
-    if (wma200 < 1.0) scores.push(100);
-    else if (wma200 < 1.2) scores.push(80);
-    else if (wma200 < 2.0) scores.push(50);
-    else if (wma200 < 3.5) scores.push(20);
-    else scores.push(0);
-  }
-  // LTH Supply 评分
-  if (has(lth)) {
-    if (lth > 70) scores.push(80);
-    else if (lth > 60) scores.push(50);
-    else scores.push(30);
-  }
-  // NUPL 评分
-  if (has(nuplVal)) {
-    if (nuplVal < 0) scores.push(100);
-    else if (nuplVal < 0.25) scores.push(70);
-    else if (nuplVal < 0.5) scores.push(40);
-    else if (nuplVal < 0.75) scores.push(15);
-    else scores.push(0);
-  }
-  // LTH-MVRV 评分
-  if (has(lthMvrv)) {
-    if (lthMvrv < 1.0) scores.push(100);
-    else if (lthMvrv < 1.5) scores.push(80);
-    else if (lthMvrv < 3.5) scores.push(40);
-    else if (lthMvrv < 5.0) scores.push(15);
-    else scores.push(0);
-  }
-  // 365日均线 评分
-  if (has(ma365)) {
-    if (ma365 < 1.0) scores.push(90);
-    else if (ma365 < 1.1) scores.push(70);
-    else if (ma365 < 1.5) scores.push(40);
-    else scores.push(10);
-  }
-  const avgScore = scores.length > 0
-    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : 0;
-  const scoreLabel = avgScore >= 80 ? "强烈抄底" : avgScore >= 60 ? "偏强" : avgScore >= 40 ? "中性偏强" : avgScore >= 20 ? "中性" : "偏顶部";
-  const scoreColor = avgScore >= 80 ? COLORS.green : avgScore >= 60 ? COLORS.green : avgScore >= 40 ? COLORS.yellow : avgScore >= 20 ? COLORS.muted : COLORS.red;
+  // --- 综合抄底/逃顶评级（加权评分系统）---
+  const rating: MarketRating | null = metrics
+    ? calculateMarketRating(metrics, fearGreed)
+    : null;
+  // 转换为抄底视角分数（100-逃顶分=抄底分）
+  const avgScore = rating ? 100 - rating.totalScore : 0;
+  const scoreLabel = rating?.level ?? "数据不足";
+  // 颜色：抄底视角 - 逃顶=红色, 恐慌=绿色
+  const scoreColor = rating
+    ? (rating.totalScore <= 30 ? COLORS.green : rating.totalScore <= 45 ? COLORS.green : rating.totalScore <= 55 ? COLORS.yellow : rating.totalScore <= 70 ? COLORS.orange : COLORS.red)
+    : COLORS.muted;
 
   return (
     <>
-      <Card title="🔍 比特币抄底时机分析" icon="" accent={COLORS.orange}>
+      <Card title="🔍 比特币抄底/逃顶分析" icon="" accent={COLORS.orange}>
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: COLORS.muted }}>BTC 当前价格</span>
           {btc ? (
@@ -1198,26 +1190,58 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
             <div style={{ fontSize: 24, color: COLORS.muted }}>数据加载中...</div>
           )}
         </div>
+
+        {/* 每日关注 */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {100 - rating.dailyScore}</span>}</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
-              {["指标", "当前", "信号", "触发?"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>{h}</th>
+              {["指标", "权重", "当前", "信号", "状态"].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {btcIndicators.map((r) => (
+            {dailyIndicators.map((r) => (
               <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
-                <td style={{ padding: "8px 6px", fontWeight: 600, color: COLORS.text }}>
+                <td style={{ padding: "6px 4px", fontWeight: 600, color: COLORS.text, fontSize: 11 }}>
                   <span style={{ display: "inline-flex", alignItems: "center" }}>
                     {r.name}
                     {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
                   </span>
                 </td>
-                <td style={{ padding: "8px 6px", color: COLORS.muted }}>{r.val}</td>
-                <td style={{ padding: "8px 6px", color: COLORS.muted, fontSize: 11 }}>{r.signal}</td>
-                <td style={{ padding: "8px 6px" }}><Badge color={r.color}>{r.badge}</Badge></td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.weight}</td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.signal}</td>
+                <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* 每周关注 */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.purple, margin: "16px 0 4px 0" }}>每周关注（链上基本面 / 技术动能）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {100 - rating.weeklyScore}</span>}</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
+              {["指标", "权重", "当前", "信号", "状态"].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {weeklyIndicators.map((r) => (
+              <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
+                <td style={{ padding: "6px 4px", fontWeight: 600, color: COLORS.text, fontSize: 11 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center" }}>
+                    {r.name}
+                    {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
+                  </span>
+                </td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.weight}</td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.signal}</td>
+                <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
               </tr>
             ))}
           </tbody>
@@ -1285,18 +1309,52 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         </div>
       </Card>
 
-      <Card title="综合抄底评级" icon="🚦" accent={COLORS.orange}>
+      <Card title="综合抄底/逃顶评级" icon="🚦" accent={COLORS.orange}>
         <div style={{ textAlign: "center", margin: "8px 0" }}>
           <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor }}>
-            {avgScore >= 80 ? "🟢 " : avgScore >= 60 ? "🟢 " : avgScore >= 40 ? "🟡 " : avgScore >= 20 ? "⚪ " : "🔴 "}{scoreLabel}
+            {rating ? (rating.totalScore <= 30 ? "🟢 " : rating.totalScore <= 55 ? "🟡 " : "🔴 ") : "⚪ "}{scoreLabel}
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor }}>{avgScore} / 100</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor }}>{rating ? `${avgScore} / 100` : "N/A"}</div>
+          <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>
+            加权综合评分（0=逃顶, 100=抄底）
+          </div>
+          {rating && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8, fontSize: 11 }}>
+              <span style={{ color: COLORS.accent }}>每日: {100 - rating.dailyScore}</span>
+              <span style={{ color: COLORS.purple }}>每周: {100 - rating.weeklyScore}</span>
+            </div>
+          )}
           <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
-            基于 {scores.length} 个维度评分{" "}
-            {triggeredCount > 0 && <span style={{ color: COLORS.green }}>({triggeredCount}个底部信号)</span>}
+            {triggeredCount > 0 && <span style={{ color: COLORS.green }}>({triggeredCount}个底部信号) </span>}
             {topCount > 0 && <span style={{ color: COLORS.red }}>({topCount}个顶部信号)</span>}
           </div>
+          {rating && (
+            <div style={{ marginTop: 8, padding: "8px 12px", background: COLORS.dimBg, borderRadius: 8, fontSize: 12, color: scoreColor, fontWeight: 600 }}>
+              {rating.suggestion}
+            </div>
+          )}
         </div>
+
+        {/* 评分刻度条 */}
+        {rating && (
+          <div style={{ position: "relative", height: 28, background: COLORS.dimBg, borderRadius: 6, overflow: "hidden", margin: "12px 0 4px" }}>
+            <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to right, ${COLORS.red}66, ${COLORS.yellow}44 50%, ${COLORS.green}66)`, borderRadius: 6 }} />
+            {[20, 40, 60, 80].map((tick) => (
+              <div key={tick} style={{ position: "absolute", left: `${tick}%`, top: 0, bottom: 0, width: 1, background: `${COLORS.muted}44` }}>
+                <span style={{ position: "absolute", top: -12, left: -6, fontSize: 8, color: COLORS.muted }}>{tick}</span>
+              </div>
+            ))}
+            <div style={{
+              position: "absolute",
+              left: `${Math.min(Math.max(avgScore, 0), 100)}%`,
+              top: 3, bottom: 3,
+              width: 6, borderRadius: 3,
+              background: scoreColor,
+              transform: "translateX(-3px)",
+              boxShadow: `0 0 8px ${scoreColor}`,
+            }} />
+          </div>
+        )}
 
         {/* AI 分析 */}
         {analysis?.cryptoAnalysis ? (

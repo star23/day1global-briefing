@@ -36,6 +36,9 @@ export async function migrateAddColumns() {
     { name: "lth_mvrv", type: "NUMERIC" },
     { name: "ma365_price", type: "NUMERIC" },
     { name: "ma365_ratio", type: "NUMERIC" },
+    { name: "etf_flow_usd", type: "NUMERIC" },
+    { name: "funding_rate", type: "NUMERIC" },
+    { name: "long_short_ratio", type: "NUMERIC" },
   ];
   for (const col of newCols) {
     try {
@@ -63,16 +66,21 @@ export async function upsertDailyMetrics(row: {
   lthMvrv: number | null;
   ma365Price: number | null;
   ma365Ratio: number | null;
+  etfFlowUsd: number | null;
+  fundingRate: number | null;
+  longShortRatio: number | null;
 }) {
   await sql`
     INSERT INTO btc_metrics_daily
       (date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
        sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed,
-       nupl, lth_mvrv, ma365_price, ma365_ratio)
+       nupl, lth_mvrv, ma365_price, ma365_ratio,
+       etf_flow_usd, funding_rate, long_short_ratio)
     VALUES
       (${row.date}, ${row.btcPrice}, ${row.weeklyRsi}, ${row.volume24h}, ${row.volumeChangePct},
        ${row.sthSopr}, ${row.lthSopr}, ${row.lthSupplyPct}, ${row.wma200Price}, ${row.wma200Multiplier}, ${row.fearGreed},
-       ${row.nupl}, ${row.lthMvrv}, ${row.ma365Price}, ${row.ma365Ratio})
+       ${row.nupl}, ${row.lthMvrv}, ${row.ma365Price}, ${row.ma365Ratio},
+       ${row.etfFlowUsd}, ${row.fundingRate}, ${row.longShortRatio})
     ON CONFLICT (date) DO UPDATE SET
       btc_price         = EXCLUDED.btc_price,
       weekly_rsi        = EXCLUDED.weekly_rsi,
@@ -88,6 +96,9 @@ export async function upsertDailyMetrics(row: {
       lth_mvrv          = EXCLUDED.lth_mvrv,
       ma365_price       = EXCLUDED.ma365_price,
       ma365_ratio       = EXCLUDED.ma365_ratio,
+      etf_flow_usd      = EXCLUDED.etf_flow_usd,
+      funding_rate       = EXCLUDED.funding_rate,
+      long_short_ratio   = EXCLUDED.long_short_ratio,
       created_at        = NOW()
   `;
 }
@@ -139,7 +150,8 @@ export async function getComparisonMetrics() {
     )
     SELECT label, id, date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
            sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed,
-           nupl, lth_mvrv, ma365_price, ma365_ratio, created_at
+           nupl, lth_mvrv, ma365_price, ma365_ratio,
+           etf_flow_usd, funding_rate, long_short_ratio, created_at
     FROM ranked
     WHERE rn = 1
   `;
