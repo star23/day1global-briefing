@@ -45,6 +45,7 @@ export interface BTCMetrics {
   ma365Price: number | null;          // BTC 365日均线价格
   ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
   etfFlowUsd: number | null;          // BTC ETF 每日净流入（美元）
+  etfFlowDays: number[];              // ETF 最近 6 日净流入数组（从最新到最旧）
   fundingRate: number | null;         // BTC 资金费率（Binance 8h）
   longShortRatio: number | null;      // 全球多空账户比
 }

@@ -1080,17 +1080,43 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     ? (ma365 < 1.1 ? COLORS.green : ma365 < 1.5 ? COLORS.muted : COLORS.yellow)
     : COLORS.muted;
 
-  // ETF 每日净流入
+  // ETF 每日净流入 + 连续天数评估
   const etfFlow = metrics?.etfFlowUsd;
+  const etfFlowDays = metrics?.etfFlowDays ?? [];
   const etfFlowVal = has(etfFlow) ? `$${(etfFlow / 1e6).toFixed(1)}M` : "数据暂不可用";
+
+  // 计算连续流入/流出天数（从最新一天开始）
+  let consecutiveInflow = 0;
+  let consecutiveOutflow = 0;
+  for (const v of etfFlowDays) {
+    if (v > 0) consecutiveInflow++;
+    else break;
+  }
+  if (consecutiveInflow === 0) {
+    for (const v of etfFlowDays) {
+      if (v < 0) consecutiveOutflow++;
+      else break;
+    }
+  }
+
   const etfFlowSignal = has(etfFlow)
-    ? (etfFlow > 500e6 ? "大量流入——机构看涨" : etfFlow > 100e6 ? "净流入——偏多" : etfFlow > -100e6 ? "流入流出平衡" : etfFlow > -500e6 ? "净流出——偏空" : "大量流出——机构撤退")
+    ? (consecutiveOutflow >= 5 ? `连续${consecutiveOutflow}日净流出——强卖出信号`
+      : consecutiveOutflow >= 3 ? `连续${consecutiveOutflow}日净流出——偏空`
+      : consecutiveInflow >= 3 ? `连续${consecutiveInflow}日净流入——强买入信号`
+      : etfFlow > 500e6 ? "大量流入——机构看涨"
+      : etfFlow > 100e6 ? "净流入——偏多"
+      : etfFlow > -100e6 ? "流入流出平衡"
+      : "净流出——偏空")
     : "等待CoinGlass数据";
   const etfFlowBadge = has(etfFlow)
-    ? (etfFlow > 500e6 ? "🔴 过热" : etfFlow > 100e6 ? "🟡 偏热" : etfFlow > -100e6 ? "⚪ 中性" : etfFlow > -500e6 ? "🟢 偏冷" : "🟢🟢 恐慌")
+    ? (consecutiveOutflow >= 5 ? "🟢🟢 强卖出"
+      : consecutiveInflow >= 3 ? "🔴 强买入"
+      : etfFlow > 500e6 ? "🔴 过热" : etfFlow > 100e6 ? "🟡 偏热" : etfFlow > -100e6 ? "⚪ 中性" : etfFlow > -500e6 ? "🟢 偏冷" : "🟢🟢 恐慌")
     : "⚪ 待接入";
   const etfFlowColor = has(etfFlow)
-    ? (etfFlow > 500e6 ? COLORS.red : etfFlow > 100e6 ? COLORS.yellow : etfFlow < -500e6 ? COLORS.green : etfFlow < -100e6 ? COLORS.green : COLORS.muted)
+    ? (consecutiveOutflow >= 5 ? COLORS.green
+      : consecutiveInflow >= 3 ? COLORS.red
+      : etfFlow > 500e6 ? COLORS.red : etfFlow > 100e6 ? COLORS.yellow : etfFlow < -500e6 ? COLORS.green : etfFlow < -100e6 ? COLORS.green : COLORS.muted)
     : COLORS.muted;
 
   // Funding Rate
@@ -1193,26 +1219,32 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         </div>
 
         {/* 每日关注 */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {100 - rating.dailyScore}</span>}</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {(32 - rating.dailyScore).toFixed(1)}</span>}</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "38%" }} />
+            <col style={{ width: "18%" }} />
+          </colgroup>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
               {["指标", "当前", "信号", "状态"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 11 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {dailyIndicators.map((r) => (
               <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
-                <td style={{ padding: "6px 4px", fontWeight: 600, color: COLORS.text, fontSize: 11 }}>
+                <td style={{ padding: "6px 4px", fontWeight: 600, color: COLORS.text, fontSize: 12 }}>
                   <span style={{ display: "inline-flex", alignItems: "center" }}>
                     {r.name}
                     {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
                   </span>
                 </td>
                 <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
-                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.signal}</td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 11 }}>{r.signal}</td>
                 <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
               </tr>
             ))}
@@ -1220,26 +1252,32 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         </table>
 
         {/* 每周关注 */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.purple, margin: "16px 0 4px 0" }}>每周关注（链上基本面 / 技术动能）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {100 - rating.weeklyScore}</span>}</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.purple, margin: "16px 0 4px 0" }}>每周关注（链上基本面 / 技术动能）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {(68 - rating.weeklyScore).toFixed(1)}</span>}</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "38%" }} />
+            <col style={{ width: "18%" }} />
+          </colgroup>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
               {["指标", "当前", "信号", "状态"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "6px 4px", color: COLORS.muted, fontSize: 11 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {weeklyIndicators.map((r) => (
               <tr key={r.name} style={{ borderBottom: `1px solid ${COLORS.cardBorder}22` }}>
-                <td style={{ padding: "6px 4px", fontWeight: 600, color: COLORS.text, fontSize: 11 }}>
+                <td style={{ padding: "6px 4px", fontWeight: 600, color: COLORS.text, fontSize: 12 }}>
                   <span style={{ display: "inline-flex", alignItems: "center" }}>
                     {r.name}
                     {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
                   </span>
                 </td>
                 <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
-                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 10 }}>{r.signal}</td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 11 }}>{r.signal}</td>
                 <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
               </tr>
             ))}
@@ -1319,8 +1357,8 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
           </div>
           {rating && (
             <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8, fontSize: 11 }}>
-              <span style={{ color: COLORS.accent }}>每日: {100 - rating.dailyScore}</span>
-              <span style={{ color: COLORS.purple }}>每周: {100 - rating.weeklyScore}</span>
+              <span style={{ color: COLORS.accent }}>每日: {(32 - rating.dailyScore).toFixed(1)} / 32</span>
+              <span style={{ color: COLORS.purple }}>每周: {(68 - rating.weeklyScore).toFixed(1)} / 68</span>
             </div>
           )}
           <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
