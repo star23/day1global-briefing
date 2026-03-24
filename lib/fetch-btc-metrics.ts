@@ -131,6 +131,7 @@ async function fetchBTC365MA(apiKey: string): Promise<number | null> {
       return null;
     }
     // 返回格式: { time, ma_value }（对象或数组）
+    console.log(`[CoinGlass] BTC 365MA raw data:`, JSON.stringify(json.data).slice(0, 500));
     const entry = Array.isArray(json.data)
       ? json.data[json.data.length - 1]
       : json.data;
@@ -139,6 +140,7 @@ async function fetchBTC365MA(apiKey: string): Promise<number | null> {
       console.log(`[CoinGlass] BTC 365MA = $${Math.round(ma).toLocaleString()}`);
       return Math.round(ma);
     }
+    console.warn(`[CoinGlass] BTC 365MA 无法解析 ma_value, entry:`, JSON.stringify(entry));
     return null;
   } catch (err) {
     console.error(`[CoinGlass] 获取 BTC 365MA 出错:`, err);
