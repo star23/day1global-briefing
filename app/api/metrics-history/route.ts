@@ -3,10 +3,12 @@
 // 返回昨天、一周前、一个月前的 BTC 指标数据
 
 import { NextResponse } from "next/server";
-import { getComparisonMetrics } from "@/lib/db";
+import { getComparisonMetrics, migrateAddColumns } from "@/lib/db";
 
 export async function GET() {
   try {
+    // 确保新增列存在（nupl, lth_mvrv, ma365_price, ma365_ratio）
+    await migrateAddColumns();
     const rows = await getComparisonMetrics();
 
     // 转换为 { yesterday, oneWeek, oneMonth } 结构
