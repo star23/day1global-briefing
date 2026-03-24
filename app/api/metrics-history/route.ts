@@ -36,6 +36,10 @@ export async function GET() {
           ? Number(row.wma200_multiplier)
           : null,
         fearGreed: row.fear_greed ? Number(row.fear_greed) : null,
+        nupl: row.nupl != null ? Number(row.nupl) : null,
+        lthMvrv: row.lth_mvrv != null ? Number(row.lth_mvrv) : null,
+        ma365Price: row.ma365_price ? Number(row.ma365_price) : null,
+        ma365Ratio: row.ma365_ratio ? Number(row.ma365_ratio) : null,
       };
 
       switch (row.label) {

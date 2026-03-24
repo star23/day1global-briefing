@@ -13,7 +13,7 @@ import { fetchNews } from "@/lib/fetch-news";
 import { fetchGeopoliticalNews } from "@/lib/fetch-geopolitical-news";
 import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
-import { ensureTable, upsertDailyMetrics } from "@/lib/db";
+import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "@/lib/db";
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
     let metricsStored = false;
     try {
       await ensureTable();
+      await migrateAddColumns();
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       await upsertDailyMetrics({
         date: today,
@@ -64,6 +65,10 @@ export async function GET(request: NextRequest) {
         wma200Price: data.btcMetrics?.wma200Price ?? null,
         wma200Multiplier: data.btcMetrics?.wma200Multiplier ?? null,
         fearGreed: data.sentiment?.cryptoFearGreed ?? null,
+        nupl: data.btcMetrics?.nupl ?? null,
+        lthMvrv: data.btcMetrics?.lthMvrv ?? null,
+        ma365Price: data.btcMetrics?.ma365Price ?? null,
+        ma365Ratio: data.btcMetrics?.ma365Ratio ?? null,
       });
       metricsStored = true;
       console.log(`[Cron] BTC 指标已写入 Postgres (${today})`);

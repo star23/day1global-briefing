@@ -89,6 +89,10 @@ export interface MetricsSnapshot {
   wma200Price: number | null;
   wma200Multiplier: number | null;
   fearGreed: number | null;
+  nupl: number | null;
+  lthMvrv: number | null;
+  ma365Price: number | null;
+  ma365Ratio: number | null;
 }
 
 /** /api/metrics-history 返回的历史对比数据 */

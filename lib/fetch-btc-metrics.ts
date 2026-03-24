@@ -166,7 +166,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
       fetchCoinGlassLatest(apiKey, "bitcoin-long-term-holder-supply", "LTH Supply"),
       fetchCoinGlassLatest(apiKey, "200-week-moving-average-heatmap", "200WMA"),
       fetchCoinGlassLatest(apiKey, "bitcoin-net-unrealized-profit-loss", "NUPL"),
-      fetchCoinGlassLatest(apiKey, "bitcoin-lth-mvrv", "LTH-MVRV"),
+      fetchCoinGlassLatest(apiKey, "bitcoin-long-term-holder-mvrv", "LTH-MVRV"),
       fetchBTC365MA(apiKey),
     ]);
 
@@ -228,7 +228,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   // 字段: nupl 或 net_unrealized_profit_loss
   let nupl: number | null = null;
   if (nuplData) {
-    const v = Number(nuplData.nupl ?? nuplData.net_unrealized_profit_loss ?? nuplData.value);
+    const v = Number(nuplData.net_unpnl ?? nuplData.nupl ?? nuplData.net_unrealized_profit_loss ?? nuplData.value);
     if (!isNaN(v)) {
       nupl = Math.round(v * 1000) / 1000;
       console.log(`[CoinGlass] NUPL = ${nupl}`);
@@ -239,7 +239,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   // 字段: lth_mvrv
   let lthMvrv: number | null = null;
   if (lthMvrvData) {
-    const v = Number(lthMvrvData.lth_mvrv ?? lthMvrvData.mvrv ?? lthMvrvData.value);
+    const v = Number(lthMvrvData.long_term_holder_mvrv ?? lthMvrvData.lth_mvrv ?? lthMvrvData.mvrv ?? lthMvrvData.value);
     if (!isNaN(v) && v > 0) {
       lthMvrv = Math.round(v * 100) / 100;
       console.log(`[CoinGlass] LTH-MVRV = ${lthMvrv}`);
