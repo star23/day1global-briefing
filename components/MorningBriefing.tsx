@@ -85,7 +85,7 @@ function formatTimestamp(ts: string): string {
 const TABS = [
   { id: "overview", label: "总览" },
   { id: "sentiment", label: "市场情绪" },
-  { id: "btc-bottom", label: "BTC底部" },
+  { id: "btc-bottom", label: "BTC抄底/逃顶" },
   { id: "portfolio", label: "持仓" },
   { id: "news", label: "新闻" },
 ];
@@ -926,15 +926,15 @@ function HistoryComparisonCard({
     inverted?: boolean; // true = 下降是利好
   }[] = [
     { name: "BTC 价格", currentVal: currentBtcPrice, snapshotKey: "btcPrice", format: (v) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` },
-    { name: "周线 RSI", currentVal: currentMetrics?.weeklyRsi, snapshotKey: "weeklyRsi", format: (v) => v.toFixed(1) },
-    { name: "STH-SOPR", currentVal: currentMetrics?.sthSopr, snapshotKey: "sthSopr", format: (v) => v.toFixed(3) },
-    { name: "LTH-SOPR", currentVal: currentMetrics?.lthSopr, snapshotKey: "lthSopr", format: (v) => v.toFixed(3) },
     { name: "恐慌贪婪", currentVal: currentFearGreed, snapshotKey: "fearGreed", format: (v) => String(Math.round(v)), inverted: true },
-    { name: "LTH 占比", currentVal: currentMetrics?.lthSupplyPercent, snapshotKey: "lthSupplyPct", format: (v) => `${v.toFixed(1)}%` },
-    { name: "200WMA 倍数", currentVal: currentMetrics?.wma200Multiplier, snapshotKey: "wma200Multiplier", format: (v) => `${v.toFixed(2)}x` },
-    { name: "NUPL", currentVal: currentMetrics?.nupl, snapshotKey: "nupl", format: (v) => v.toFixed(3) },
     { name: "LTH-MVRV", currentVal: currentMetrics?.lthMvrv, snapshotKey: "lthMvrv", format: (v) => v.toFixed(2) },
+    { name: "NUPL", currentVal: currentMetrics?.nupl, snapshotKey: "nupl", format: (v) => v.toFixed(3) },
+    { name: "LTH 占比", currentVal: currentMetrics?.lthSupplyPercent, snapshotKey: "lthSupplyPct", format: (v) => `${v.toFixed(1)}%` },
+    { name: "LTH-SOPR", currentVal: currentMetrics?.lthSopr, snapshotKey: "lthSopr", format: (v) => v.toFixed(3) },
+    { name: "STH-SOPR", currentVal: currentMetrics?.sthSopr, snapshotKey: "sthSopr", format: (v) => v.toFixed(3) },
     { name: "365日均线倍数", currentVal: currentMetrics?.ma365Ratio, snapshotKey: "ma365Ratio", format: (v) => `${v.toFixed(2)}x` },
+    { name: "200WMA 倍数", currentVal: currentMetrics?.wma200Multiplier, snapshotKey: "wma200Multiplier", format: (v) => `${v.toFixed(2)}x` },
+    { name: "周线 RSI", currentVal: currentMetrics?.weeklyRsi, snapshotKey: "weeklyRsi", format: (v) => v.toFixed(1) },
   ];
 
   const hasHistory = history && (history.yesterday || history.oneWeek || history.oneMonth);
@@ -1202,6 +1202,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     "NUPL": "全网未实现净盈亏比率(Net Unrealized Profit/Loss)：=(市值-已实现市值)/市值。<0为全网亏损（底部），>0.75为极度贪婪（顶部）。",
     "LTH-MVRV": "长期持有者市场价值/已实现价值(LTH Market Value to Realized Value)：衡量长期持有者整体浮盈水平。<1为浮亏（底部），>3.5为大幅浮盈（接近顶部）。",
     "365日均线": "BTC 365日移动平均线：长期趋势指标。价格/均线比值<1.0表示低于年线（偏空），>1.5表示大幅偏离（过热）。",
+    "200周均线": "200周移动平均线：BTC最可靠的长期估值锚。倍数<1.0为历史级底部，>3.5为极端过热。历史上每次触及都是周期大底。",
   };
 
   // 每日关注指标
@@ -1214,14 +1215,15 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   // 每周关注指标
   const weeklyIndicators = [
-    { name: "LTH-MVRV", val: lthMvrvDisplay, signal: lthMvrvSignal, badge: lthMvrvBadge, color: lthMvrvColor, weight: 10 },
-    { name: "NUPL", val: nuplDisplay, signal: nuplSignal, badge: nuplBadge, color: nuplColor, weight: 9 },
-    { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor, weight: 8 },
-    { name: "STH-SOPR", val: sthSoprVal, signal: sthSoprSignal, badge: sthSoprBadge, color: sthSoprColor, weight: 7 },
-    { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor, weight: 6 },
+    { name: "LTH-MVRV", val: lthMvrvDisplay, signal: lthMvrvSignal, badge: lthMvrvBadge, color: lthMvrvColor, weight: 12 },
+    { name: "NUPL", val: nuplDisplay, signal: nuplSignal, badge: nuplBadge, color: nuplColor, weight: 11 },
+    { name: "LTH-SOPR", val: lthSoprVal, signal: lthSoprSignal, badge: lthSoprBadge, color: lthSoprColor, weight: 9 },
+    { name: "STH-SOPR", val: sthSoprVal, signal: sthSoprSignal, badge: sthSoprBadge, color: sthSoprColor, weight: 8 },
+    { name: "LTH持有者", val: lthVal, signal: lthSignal, badge: lthBadge, color: lthColor, weight: 7 },
     { name: "365日均线", val: ma365Display, signal: ma365Signal, badge: ma365Badge, color: ma365Color, weight: 6 },
+    { name: "200周均线", val: wma200Val, signal: wma200Signal, badge: wma200Badge, color: wma200Color, weight: 6 },
     { name: "周线RSI", val: rsiVal, signal: rsiSignal, badge: rsiBadge, color: rsiColor, weight: 5 },
-    { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor, weight: 3 },
+    { name: "成交量变化", val: volVal, signal: volSignal, badge: volBadge, color: volColor, weight: 4 },
   ];
 
   const btcIndicators = [...dailyIndicators, ...weeklyIndicators];
@@ -1243,7 +1245,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   return (
     <>
-      <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>🔍 比特币抄底/逃顶分析<InfoTooltip text={`权重分配：\n每日(32)：ETF净流入:12 | Funding Rate:8 | 多空比:5 | 恐惧贪婪:7\n每周(68)：LTH-MVRV:10 | NUPL:9 | LTH-SOPR:8 | STH-SOPR:7 | LTH持有者:6 | 365日均线:6 | 200周均线:6 | 周线RSI:5 | 成交量:3`} /></span>} icon="" accent={COLORS.orange}>
+      <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>🔍 比特币抄底/逃顶分析<InfoTooltip text={`权重分配（满分100）：\n每日(32)：ETF净流入:12 | Funding Rate:8 | 多空比:5 | 恐惧贪婪:7\n每周(68)：LTH-MVRV:12 | NUPL:11 | LTH-SOPR:9 | STH-SOPR:8 | LTH持有者:7 | 365日均线:6 | 200周均线:6 | 周线RSI:5 | 成交量:4`} /></span>} icon="" accent={COLORS.orange}>
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: COLORS.muted }}>BTC 当前价格</span>
           {btc ? (

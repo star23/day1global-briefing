@@ -42,6 +42,9 @@ export async function GET() {
         lthMvrv: row.lth_mvrv != null ? Number(row.lth_mvrv) : null,
         ma365Price: row.ma365_price ? Number(row.ma365_price) : null,
         ma365Ratio: row.ma365_ratio ? Number(row.ma365_ratio) : null,
+        etfFlowUsd: row.etf_flow_usd != null ? Number(row.etf_flow_usd) : null,
+        fundingRate: row.funding_rate != null ? Number(row.funding_rate) : null,
+        longShortRatio: row.long_short_ratio != null ? Number(row.long_short_ratio) : null,
       };
 
       switch (row.label) {
