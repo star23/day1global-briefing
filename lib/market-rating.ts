@@ -125,15 +125,15 @@ function normalizeIndicator(name: string, value: number): number {
  *   - 恐惧贪婪指数: 7
  *
  * 每周关注 (总权重 68):
- *   - LTH-MVRV: 10
- *   - NUPL: 9
- *   - LTH-SOPR: 8
- *   - STH-SOPR: 7
- *   - LTH持有者占比: 6
+ *   - LTH-MVRV: 12
+ *   - NUPL: 11
+ *   - LTH-SOPR: 9
+ *   - STH-SOPR: 8
+ *   - LTH持有者占比: 7
  *   - 365日均线倍数: 6
  *   - 200周均线倍数: 6
  *   - 周线 RSI: 5
- *   - 成交量变化: 3
+ *   - 成交量变化: 4
  */
 export function calculateMarketRating(
   btcMetrics: BTCMetrics,
@@ -155,17 +155,17 @@ export function calculateMarketRating(
     { name: "fearGreed", label: "恐惧贪婪指数", value: fearGreed, weight: 7, group: "daily", category: "宏观情绪" },
 
     // 每周关注 — 链上基本面
-    { name: "lthMvrv", label: "LTH-MVRV", value: btcMetrics.lthMvrv, weight: 10, group: "weekly", category: "链上基本面" },
-    { name: "nupl", label: "NUPL", value: btcMetrics.nupl, weight: 9, group: "weekly", category: "链上基本面" },
-    { name: "lthSopr", label: "LTH-SOPR", value: btcMetrics.lthSopr, weight: 8, group: "weekly", category: "链上基本面" },
-    { name: "sthSopr", label: "STH-SOPR", value: btcMetrics.sthSopr, weight: 7, group: "weekly", category: "链上基本面" },
-    { name: "lthSupplyPercent", label: "LTH 持有者占比", value: btcMetrics.lthSupplyPercent, weight: 6, group: "weekly", category: "链上基本面" },
+    { name: "lthMvrv", label: "LTH-MVRV", value: btcMetrics.lthMvrv, weight: 12, group: "weekly", category: "链上基本面" },
+    { name: "nupl", label: "NUPL", value: btcMetrics.nupl, weight: 11, group: "weekly", category: "链上基本面" },
+    { name: "lthSopr", label: "LTH-SOPR", value: btcMetrics.lthSopr, weight: 9, group: "weekly", category: "链上基本面" },
+    { name: "sthSopr", label: "STH-SOPR", value: btcMetrics.sthSopr, weight: 8, group: "weekly", category: "链上基本面" },
+    { name: "lthSupplyPercent", label: "LTH 持有者占比", value: btcMetrics.lthSupplyPercent, weight: 7, group: "weekly", category: "链上基本面" },
 
     // 每周关注 — 技术动能
     { name: "ma365Ratio", label: "365日均线倍数", value: btcMetrics.ma365Ratio, weight: 6, group: "weekly", category: "技术动能" },
     { name: "wma200Multiplier", label: "200周均线倍数", value: btcMetrics.wma200Multiplier, weight: 6, group: "weekly", category: "技术动能" },
     { name: "weeklyRsi", label: "周线 RSI", value: btcMetrics.weeklyRsi, weight: 5, group: "weekly", category: "技术动能" },
-    { name: "volumeChangePercent", label: "成交量变化", value: btcMetrics.volumeChangePercent, weight: 3, group: "weekly", category: "技术动能" },
+    { name: "volumeChangePercent", label: "成交量变化", value: btcMetrics.volumeChangePercent, weight: 4, group: "weekly", category: "技术动能" },
   ];
 
   const indicators: IndicatorScore[] = [];
