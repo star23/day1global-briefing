@@ -252,6 +252,50 @@ function splitMessage(message: string): string[] {
   return parts.map((p) => (p.length > 4096 ? p.substring(0, 4090) + "\n..." : p));
 }
 
+/** 发送音频文件到 Telegram */
+async function sendTelegramAudio(audioBuffer: Buffer, caption?: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId) {
+    console.log("[Telegram] 未设置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，跳过音频推送");
+    return false;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append(
+      "audio",
+      new Blob([audioBuffer as unknown as BlobPart], { type: "audio/mpeg" }),
+      "day1global-briefing.mp3"
+    );
+    if (caption) {
+      formData.append("caption", caption.substring(0, 1024));
+      formData.append("parse_mode", "HTML");
+    }
+    formData.append("title", "Day1Global 每日早报");
+    formData.append("performer", "Day1Global AI");
+
+    const res = await fetch(`${TELEGRAM_API}/bot${token}/sendAudio`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("[Telegram] 音频发送失败:", err);
+      return false;
+    }
+
+    console.log("[Telegram] 音频推送成功");
+    return true;
+  } catch (err) {
+    console.error("[Telegram] 音频推送出错:", err);
+    return false;
+  }
+}
+
 /** 推送每日早报到 Telegram */
 export async function pushTelegramBriefing(data: MarketDataResponse, analysis: AIAnalysis): Promise<boolean> {
   const message = formatTelegramMessage(data, analysis);
@@ -265,4 +309,17 @@ export async function pushTelegramBriefing(data: MarketDataResponse, analysis: A
     if (!ok) allOk = false;
   }
   return allOk;
+}
+
+/** 推送音频早报到 Telegram */
+export async function pushTelegramAudio(audioBuffer: Buffer): Promise<boolean> {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Shanghai",
+  });
+  const caption = `<b>Day1Global 每日早报</b>\n${dateStr}\n\n完整数据: <a href="https://brief.day1global.xyz/">brief.day1global.xyz</a>`;
+  return sendTelegramAudio(audioBuffer, caption);
 }

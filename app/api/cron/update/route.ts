@@ -11,7 +11,8 @@ import { Redis } from "@upstash/redis";
 import { generateMarketAnalysis } from "@/lib/generate-analysis";
 import { fetchNews } from "@/lib/fetch-news";
 import { fetchGeopoliticalNews } from "@/lib/fetch-geopolitical-news";
-import { pushTelegramBriefing } from "@/lib/telegram";
+import { pushTelegramBriefing, pushTelegramAudio } from "@/lib/telegram";
+import { generateTTSAudio } from "@/lib/tts";
 import { MarketDataResponse } from "@/lib/types";
 import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "@/lib/db";
 
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
     // ---- 第三步：调用 Claude AI 生成分析 ----
     let analysisGenerated = false;
     let telegramPushed = false;
+    let audioGenerated = false;
     let newsCount = 0;
 
     // 只有配置了 API Key 才尝试生成 AI 分析
@@ -121,6 +123,36 @@ export async function GET(request: NextRequest) {
         } else {
           console.log("[Cron] skip_telegram=true，跳过 Telegram 推送");
         }
+
+        // ---- 第六步：生成 TTS 音频早报 ----
+        if (process.env.OPENAI_API_KEY) {
+          try {
+            console.log("[Cron] 正在生成 TTS 音频早报...");
+            const audioBuffer = await generateTTSAudio(data, analysis);
+
+            // 存入 Redis (base64)，24h 过期
+            const audioBase64 = audioBuffer.toString("base64");
+            await redis.set("briefing-audio", audioBase64, { ex: 86400 });
+            audioGenerated = true;
+            console.log(`[Cron] 音频早报已生成并缓存 (${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+            // 推送音频到 Telegram
+            if (!skipTelegram) {
+              try {
+                const audioPushed = await pushTelegramAudio(audioBuffer);
+                if (audioPushed) {
+                  console.log("[Cron] Telegram 音频推送成功");
+                }
+              } catch (audioTgErr) {
+                console.error("[Cron] Telegram 音频推送失败:", audioTgErr);
+              }
+            }
+          } catch (ttsErr) {
+            console.error("[Cron] TTS 音频生成失败:", ttsErr);
+          }
+        } else {
+          console.log("[Cron] 未设置 OPENAI_API_KEY，跳过音频生成");
+        }
       } catch (aiErr) {
         // AI 生成失败不影响整体流程，市场数据更新仍然成功
         console.error("[Cron] AI 分析生成失败:", aiErr);
@@ -142,6 +174,9 @@ export async function GET(request: NextRequest) {
         : telegramPushed
           ? "已推送"
           : "未推送",
+      audio: audioGenerated
+        ? "已生成"
+        : "未生成（缺少 OPENAI_API_KEY 或生成失败）",
     });
   } catch (err) {
     console.error("[Cron] 数据更新失败:", err);
