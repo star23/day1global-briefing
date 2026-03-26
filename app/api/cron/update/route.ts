@@ -13,6 +13,7 @@ import { fetchNews } from "@/lib/fetch-news";
 import { fetchGeopoliticalNews } from "@/lib/fetch-geopolitical-news";
 import { pushTelegramBriefing, pushTelegramAudio } from "@/lib/telegram";
 import { generateTTSAudio } from "@/lib/tts";
+import { put } from "@vercel/blob";
 import { MarketDataResponse } from "@/lib/types";
 import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "@/lib/db";
 
@@ -130,11 +131,18 @@ export async function GET(request: NextRequest) {
             console.log("[Cron] 正在生成 TTS 音频早报...");
             const audioBuffer = await generateTTSAudio(data, analysis);
 
-            // 存入 Redis (base64)，24h 过期
-            const audioBase64 = audioBuffer.toString("base64");
-            await redis.set("briefing-audio", audioBase64, { ex: 86400 });
+            // 上传到 Vercel Blob
+            const today = new Date().toISOString().slice(0, 10);
+            const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
+              access: "public",
+              contentType: "audio/mpeg",
+              addRandomSuffix: false,
+            });
+
+            // 在 Redis 只存 URL，24h 过期
+            await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
             audioGenerated = true;
-            console.log(`[Cron] 音频早报已生成并缓存 (${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Cron] 音频早报已生成并上传 (${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB) → ${blob.url}`);
 
             // 推送音频到 Telegram
             if (!skipTelegram) {
