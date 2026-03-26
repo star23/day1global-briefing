@@ -320,6 +320,8 @@ function LoadingState() {
 // ========== 主组件 ==========
 export default function MorningBriefing() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [audioState, setAudioState] = useState<"idle" | "loading" | "playing" | "paused" | "error">("idle");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data, error, isLoading } = useSWR<MarketDataResponse>(
     "/api/market-data",
@@ -360,6 +362,40 @@ export default function MorningBriefing() {
     weekday: "long",
   });
 
+  // 音频播放控制
+  const toggleAudio = () => {
+    if (audioState === "playing") {
+      audioRef.current?.pause();
+      setAudioState("paused");
+      return;
+    }
+    if (audioState === "paused" && audioRef.current) {
+      audioRef.current.play();
+      setAudioState("playing");
+      return;
+    }
+    // 首次加载
+    setAudioState("loading");
+    const audio = new Audio("/api/audio");
+    audio.oncanplaythrough = () => {
+      audio.play();
+      setAudioState("playing");
+    };
+    audio.onended = () => setAudioState("idle");
+    audio.onerror = () => setAudioState("error");
+    audioRef.current = audio;
+  };
+
+  // 清理音频
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div
       style={{
@@ -373,6 +409,10 @@ export default function MorningBriefing() {
         @keyframes shimmer {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
 
@@ -441,11 +481,44 @@ export default function MorningBriefing() {
                 </a>
               </span>
             </h1>
-            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              日报订阅
-              <a href="https://t.me/day1global" target="_blank" rel="noopener noreferrer" title="Telegram 日报订阅" style={{ color: COLORS.muted, display: "inline-flex", alignItems: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-              </a>
+            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                日报订阅
+                <a href="https://t.me/day1global" target="_blank" rel="noopener noreferrer" title="Telegram 日报订阅" style={{ color: COLORS.muted, display: "inline-flex", alignItems: "center" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                </a>
+              </span>
+              <span style={{ color: "#475569" }}>|</span>
+              <button
+                onClick={toggleAudio}
+                title={audioState === "playing" ? "暂停音频早报" : "收听音频早报"}
+                style={{
+                  background: audioState === "playing" ? "rgba(99, 102, 241, 0.2)" : "rgba(255,255,255,0.05)",
+                  border: `1px solid ${audioState === "playing" ? "#6366f1" : "#334155"}`,
+                  borderRadius: 16,
+                  padding: "2px 10px",
+                  color: audioState === "playing" ? "#818cf8" : audioState === "error" ? COLORS.red : COLORS.muted,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  transition: "all 0.2s",
+                }}
+              >
+                {audioState === "loading" ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "spin 1s linear infinite" }}>
+                    <path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4m-3.93 7.07l-2.83-2.83M6.34 6.34L3.51 3.51"/>
+                  </svg>
+                ) : audioState === "playing" ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                ) : audioState === "error" ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                )}
+                {audioState === "loading" ? "加载中" : audioState === "playing" ? "暂停" : audioState === "paused" ? "继续播放" : audioState === "error" ? "音频不可用" : "听早报"}
+              </button>
             </div>
             <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 4 }}>
               {dateStr}
