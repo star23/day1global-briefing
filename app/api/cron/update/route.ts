@@ -1,11 +1,7 @@
-// ========== 定时任务接口 ==========
-// Vercel Cron Job 每天定时调用此接口
-// 1. 获取最新市场数据
-// 2. 获取最新新闻
-// 3. 调用 Claude AI 生成中文市场分析 + 精选新闻
-// 4. 将分析结果存入 Upstash Redis 供前端读取
-// 5. 推送到 Telegram（可通过 ?skip_telegram=true 跳过）
-// 注：TTS 音频由 GitHub Actions 独立生成，不在此处处理
+// ========== 手动触发接口（备用） ==========
+// 主流程已迁移到 GitHub Actions (scripts/daily-briefing.ts)
+// 此接口保留用于手动调试或紧急备用
+// 注意：Vercel 免费版有 10s 超时限制，AI 分析可能超时
 
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";

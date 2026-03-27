@@ -1,17 +1,23 @@
-name: Generate Audio Briefing
+name: Daily Briefing
 
 on:
-  # 每天 UTC 23:05 运行（Vercel cron 在 23:00 触发，脚本会自动等待分析就绪）
+  # 每天 UTC 23:00 运行
   schedule:
-    - cron: '5 23 * * *'
+    - cron: '0 23 * * *'
   # 手动触发（GitHub Actions 页面点 "Run workflow"）
   workflow_dispatch:
+    inputs:
+      skip_telegram:
+        description: '跳过 Telegram 推送'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
-  generate-audio:
+  daily-briefing:
     runs-on: ubuntu-latest
     if: github.repository == 'star23/day1global-briefing'
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -26,13 +32,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate audio briefing
-        run: npx tsx scripts/generate-audio.ts
+      - name: Run daily briefing
+        run: |
+          ARGS=""
+          if [ "${{ inputs.skip_telegram }}" = "true" ]; then
+            ARGS="--skip-telegram"
+          fi
+          npx tsx scripts/daily-briefing.ts $ARGS
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
           KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
           BRIEFING_BASE_URL: https://brief.day1global.xyz
