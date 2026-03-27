@@ -13,6 +13,38 @@ import { put } from "@vercel/blob";
 import { Redis } from "@upstash/redis";
 
 const BASE_URL = process.env.BRIEFING_BASE_URL || "https://brief.day1global.xyz";
+const MAX_RETRIES = 6;         // 最多等 6 次
+const RETRY_INTERVAL = 30_000; // 每次等 30 秒，共最多 3 分钟
+
+/** 等待 AI 分析就绪（带重试） */
+async function waitForAnalysis(): Promise<AIAnalysis> {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`  第 ${attempt}/${MAX_RETRIES} 次检查...`);
+    const res = await fetch(`${BASE_URL}/api/analysis`);
+    if (res.ok) {
+      const analysis: AIAnalysis | null = await res.json();
+      if (analysis) {
+        // 检查分析是否是今天生成的（防止用了昨天的旧数据）
+        const analysisDate = new Date(analysis.generatedAt).toISOString().slice(0, 10);
+        const today = new Date().toISOString().slice(0, 10);
+        if (analysisDate === today) {
+          return analysis;
+        }
+        console.log(`  分析日期 ${analysisDate} 不是今天 ${today}，等待更新...`);
+      } else {
+        console.log("  分析尚未生成...");
+      }
+    } else {
+      console.log(`  API 返回 ${res.status}...`);
+    }
+
+    if (attempt < MAX_RETRIES) {
+      console.log(`  等待 ${RETRY_INTERVAL / 1000} 秒后重试...`);
+      await new Promise((r) => setTimeout(r, RETRY_INTERVAL));
+    }
+  }
+  throw new Error(`等待 ${MAX_RETRIES * RETRY_INTERVAL / 1000} 秒后仍未获取到今天的 AI 分析，放弃`);
+}
 
 async function main() {
   console.log("=== Day1Global 音频早报生成 ===");
@@ -37,16 +69,9 @@ async function main() {
   const data: MarketDataResponse = await dataRes.json();
   console.log(`  市场数据时间: ${data.timestamp}`);
 
-  // 2. 获取 AI 分析
+  // 2. 获取 AI 分析（等待 cron 完成）
   console.log("[2/5] 获取 AI 分析...");
-  const analysisRes = await fetch(`${BASE_URL}/api/analysis`);
-  if (!analysisRes.ok) {
-    throw new Error(`获取 AI 分析失败: ${analysisRes.status}`);
-  }
-  const analysis: AIAnalysis | null = await analysisRes.json();
-  if (!analysis) {
-    throw new Error("AI 分析尚未生成，请确认 cron 已执行");
-  }
+  const analysis = await waitForAnalysis();
   console.log(`  分析生成时间: ${analysis.generatedAt}`);
 
   // 3. 生成 TTS 音频

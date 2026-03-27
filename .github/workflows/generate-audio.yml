@@ -1,9 +1,9 @@
 name: Generate Audio Briefing
 
 on:
-  # 每天 UTC 23:15 运行（Vercel cron 在 23:00 完成后）
+  # 每天 UTC 23:05 运行（Vercel cron 在 23:00 触发，脚本会自动等待分析就绪）
   schedule:
-    - cron: '15 23 * * *'
+    - cron: '5 23 * * *'
   # 手动触发（GitHub Actions 页面点 "Run workflow"）
   workflow_dispatch:
 
