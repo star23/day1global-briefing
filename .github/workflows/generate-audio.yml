@@ -1,0 +1,38 @@
+name: Generate Audio Briefing
+
+on:
+  # 每天 UTC 23:15 运行（Vercel cron 在 23:00 完成后）
+  schedule:
+    - cron: '15 23 * * *'
+  # 手动触发（GitHub Actions 页面点 "Run workflow"）
+  workflow_dispatch:
+
+jobs:
+  generate-audio:
+    runs-on: ubuntu-latest
+    if: github.repository == 'star23/day1global-briefing'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate audio briefing
+        run: npx tsx scripts/generate-audio.ts
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BRIEFING_BASE_URL: https://brief.day1global.xyz
