@@ -1,19 +1,14 @@
-// ========== 定时任务接口 ==========
-// Vercel Cron Job 每天定时调用此接口
-// 1. 获取最新市场数据
-// 2. 获取最新新闻
-// 3. 调用 Claude AI 生成中文市场分析 + 精选新闻
-// 4. 将分析结果存入 Upstash Redis 供前端读取
-// 5. 推送到 Telegram（可通过 ?skip_telegram=true 跳过）
+// ========== 手动触发接口（备用） ==========
+// 主流程已迁移到 GitHub Actions (scripts/daily-briefing.ts)
+// 此接口保留用于手动调试或紧急备用
+// 注意：Vercel 免费版有 10s 超时限制，AI 分析可能超时
 
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { generateMarketAnalysis } from "@/lib/generate-analysis";
 import { fetchNews } from "@/lib/fetch-news";
 import { fetchGeopoliticalNews } from "@/lib/fetch-geopolitical-news";
-import { pushTelegramBriefing, pushTelegramAudio } from "@/lib/telegram";
-import { generateTTSAudio } from "@/lib/tts";
-import { put } from "@vercel/blob";
+import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
 import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "@/lib/db";
 
@@ -92,7 +87,6 @@ export async function GET(request: NextRequest) {
     // ---- 第三步：调用 Claude AI 生成分析 ----
     let analysisGenerated = false;
     let telegramPushed = false;
-    let audioGenerated = false;
     let newsCount = 0;
 
     // 只有配置了 API Key 才尝试生成 AI 分析
@@ -125,42 +119,6 @@ export async function GET(request: NextRequest) {
           console.log("[Cron] skip_telegram=true，跳过 Telegram 推送");
         }
 
-        // ---- 第六步：生成 TTS 音频早报 ----
-        if (process.env.OPENAI_API_KEY) {
-          try {
-            console.log("[Cron] 正在生成 TTS 音频早报...");
-            const audioBuffer = await generateTTSAudio(data, analysis);
-
-            // 上传到 Vercel Blob
-            const today = new Date().toISOString().slice(0, 10);
-            const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
-              access: "public",
-              contentType: "audio/mpeg",
-              addRandomSuffix: false,
-            });
-
-            // 在 Redis 只存 URL，24h 过期
-            await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
-            audioGenerated = true;
-            console.log(`[Cron] 音频早报已生成并上传 (${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB) → ${blob.url}`);
-
-            // 推送音频到 Telegram
-            if (!skipTelegram) {
-              try {
-                const audioPushed = await pushTelegramAudio(audioBuffer);
-                if (audioPushed) {
-                  console.log("[Cron] Telegram 音频推送成功");
-                }
-              } catch (audioTgErr) {
-                console.error("[Cron] Telegram 音频推送失败:", audioTgErr);
-              }
-            }
-          } catch (ttsErr) {
-            console.error("[Cron] TTS 音频生成失败:", ttsErr);
-          }
-        } else {
-          console.log("[Cron] 未设置 OPENAI_API_KEY，跳过音频生成");
-        }
       } catch (aiErr) {
         // AI 生成失败不影响整体流程，市场数据更新仍然成功
         console.error("[Cron] AI 分析生成失败:", aiErr);
@@ -182,9 +140,7 @@ export async function GET(request: NextRequest) {
         : telegramPushed
           ? "已推送"
           : "未推送",
-      audio: audioGenerated
-        ? "已生成"
-        : "未生成（缺少 OPENAI_API_KEY 或生成失败）",
+      audio: "由 GitHub Actions 独立生成",
     });
   } catch (err) {
     console.error("[Cron] 数据更新失败:", err);
