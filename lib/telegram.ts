@@ -274,7 +274,7 @@ async function sendTelegramAudio(audioBuffer: Buffer, caption?: string): Promise
       formData.append("caption", caption.substring(0, 1024));
       formData.append("parse_mode", "HTML");
     }
-    formData.append("title", "Day1Global 每日早报");
+    formData.append("title", "Day1Global 每日早报音频版");
     formData.append("performer", "Day1Global AI");
 
     const res = await fetch(`${TELEGRAM_API}/bot${token}/sendAudio`, {

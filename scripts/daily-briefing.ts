@@ -5,9 +5,8 @@
 // 3. 获取新闻 + 地缘新闻
 // 4. 调用 Claude AI 生成分析
 // 5. 存入 Redis
-// 6. 推送文字早报到 Telegram
-// 7. 生成 TTS 音频
-// 8. 上传音频到 Blob + 推送 Telegram
+// 6. 生成 TTS 音频 + 上传 Blob
+// 7. 推送 Telegram（音频在前，文字在后）
 
 import { MarketDataResponse } from "../lib/types";
 import { fetchNews } from "../lib/fetch-news";
@@ -44,7 +43,7 @@ async function main() {
   });
 
   // ---- 第一步：获取市场数据 ----
-  console.log("[1/8] 获取市场数据...");
+  console.log("[1/7] 获取市场数据...");
   const dataRes = await fetch(`${BASE_URL}/api/market-data`);
   if (!dataRes.ok) {
     throw new Error(`获取市场数据失败: ${dataRes.status}`);
@@ -54,7 +53,7 @@ async function main() {
   console.log(`  BTC: $${data.crypto?.BTC?.price?.toFixed(0) || "N/A"}`);
 
   // ---- 第二步：BTC 指标存入 Postgres ----
-  console.log("[2/8] 存储 BTC 指标到 Postgres...");
+  console.log("[2/7] 存储 BTC 指标到 Postgres...");
   try {
     await ensureTable();
     await migrateAddColumns();
@@ -82,11 +81,10 @@ async function main() {
     console.log(`  ✓ 已写入 (${today})`);
   } catch (dbErr) {
     console.error("  ✗ Postgres 写入失败:", dbErr);
-    // 不中断流程
   }
 
   // ---- 第三步：获取新闻 ----
-  console.log("[3/8] 获取新闻...");
+  console.log("[3/7] 获取新闻...");
   const [rawNews, geoNews] = await Promise.all([
     fetchNews(),
     fetchGeopoliticalNews(),
@@ -95,60 +93,62 @@ async function main() {
   console.log(`  ✓ 地缘新闻: 停火 ${geoNews.iranCeasefire.length} 条, 海峡 ${geoNews.hormuzStrait.length} 条`);
 
   // ---- 第四步：Claude AI 生成分析 ----
-  console.log("[4/8] 调用 Claude AI 生成分析...");
+  console.log("[4/7] 调用 Claude AI 生成分析...");
   const analysis = await generateMarketAnalysis(data, rawNews, geoNews);
   console.log(`  ✓ 分析已生成: ${analysis.generatedAt}`);
   console.log(`  精选新闻 ${analysis.topNews.length} 条`);
 
   // ---- 第五步：存入 Redis ----
-  console.log("[5/8] 存入 Redis...");
+  console.log("[5/7] 存入 Redis...");
   await redis.set("ai-analysis", analysis, { ex: 86400 });
   console.log("  ✓ AI 分析已缓存 (24h TTL)");
 
-  // ---- 第六步：推送文字到 Telegram ----
-  if (!skipTelegram) {
-    console.log("[6/8] 推送文字早报到 Telegram...");
-    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      const pushed = await pushTelegramBriefing(data, analysis);
-      console.log(pushed ? "  ✓ 文字推送成功" : "  ✗ 文字推送失败");
-    } else {
-      console.log("  - 未设置 Telegram 环境变量，跳过");
+  // ---- 第六步：生成 TTS 音频 + 上传 Blob ----
+  let audioBuffer: Buffer | null = null;
+  if (process.env.OPENAI_API_KEY) {
+    console.log("[6/7] 生成 TTS 音频...");
+    try {
+      audioBuffer = await generateTTSAudio(data, analysis);
+      const sizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2);
+      console.log(`  ✓ 音频大小: ${sizeMB} MB`);
+
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        const today = new Date().toISOString().slice(0, 10);
+        const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
+          access: "public",
+          contentType: "audio/mpeg",
+          addRandomSuffix: false,
+        });
+        await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
+        console.log(`  ✓ Blob URL: ${blob.url}`);
+      }
+    } catch (ttsErr) {
+      console.error("  ✗ 音频生成失败:", ttsErr);
+      audioBuffer = null;
     }
   } else {
-    console.log("[6/8] 跳过 Telegram 文字推送");
+    console.log("[6/7] 未设置 OPENAI_API_KEY，跳过音频生成");
   }
 
-  // ---- 第七步：生成 TTS 音频 ----
-  if (process.env.OPENAI_API_KEY) {
-    console.log("[7/8] 生成 TTS 音频...");
-    const audioBuffer = await generateTTSAudio(data, analysis);
-    const sizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2);
-    console.log(`  ✓ 音频大小: ${sizeMB} MB`);
+  // ---- 第七步：推送 Telegram（音频在前，文字在后） ----
+  if (!skipTelegram && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+    console.log("[7/7] 推送到 Telegram...");
 
-    // ---- 第八步：上传 Blob + Telegram 音频 ----
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log("[8/8] 上传音频到 Vercel Blob...");
-      const today = new Date().toISOString().slice(0, 10);
-      const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
-        access: "public",
-        contentType: "audio/mpeg",
-        addRandomSuffix: false,
-      });
-      await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
-      console.log(`  ✓ Blob URL: ${blob.url}`);
+    // 先推音频
+    if (audioBuffer) {
+      const audioPushed = await pushTelegramAudio(audioBuffer);
+      console.log(audioPushed ? "  ✓ 音频推送成功" : "  ✗ 音频推送失败");
     } else {
-      console.log("[8/8] 未设置 BLOB_READ_WRITE_TOKEN，跳过 Blob 上传");
+      console.log("  - 无音频，跳过音频推送");
     }
 
-    // 推送音频到 Telegram
-    if (!skipTelegram && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      console.log("  推送音频到 Telegram...");
-      const pushed = await pushTelegramAudio(audioBuffer);
-      console.log(pushed ? "  ✓ 音频推送成功" : "  ✗ 音频推送失败");
-    }
+    // 再推文字
+    const textPushed = await pushTelegramBriefing(data, analysis);
+    console.log(textPushed ? "  ✓ 文字推送成功" : "  ✗ 文字推送失败");
+  } else if (skipTelegram) {
+    console.log("[7/7] 跳过 Telegram 推送");
   } else {
-    console.log("[7/8] 未设置 OPENAI_API_KEY，跳过音频生成");
-    console.log("[8/8] 跳过");
+    console.log("[7/7] 未设置 Telegram 环境变量，跳过");
   }
 
   console.log("\n=== 完成 ===");
