@@ -6,6 +6,14 @@ import { MarketDataResponse, AIAnalysis } from "./types";
 
 const TELEGRAM_API = "https://api.telegram.org";
 
+/** 转义 HTML 特殊字符，防止 Telegram parse_mode=HTML 解析失败 */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 /** 发送 Telegram 消息（支持 HTML 格式） */
 async function sendTelegramMessage(text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -128,36 +136,36 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   // ---- AI 分析 ----
   lines.push("");
   lines.push(`🧠 <b>AI 宏观判断</b>`);
-  lines.push(analysis.macroAnalysis);
+  lines.push(escapeHtml(analysis.macroAnalysis));
 
   lines.push("");
   lines.push(`₿ <b>AI 加密分析</b>`);
-  lines.push(analysis.cryptoAnalysis);
+  lines.push(escapeHtml(analysis.cryptoAnalysis));
 
   lines.push("");
   lines.push(`💼 <b>操作建议</b>`);
-  lines.push(analysis.actionSuggestions);
+  lines.push(escapeHtml(analysis.actionSuggestions));
 
   // ---- 地缘政治专题 ----
   if (analysis.iranCeasefire) {
     lines.push("");
     lines.push(`🌍 <b>伊朗停火进展</b>`);
-    lines.push(analysis.iranCeasefire);
+    lines.push(escapeHtml(analysis.iranCeasefire));
   }
   if (analysis.hormuzStrait) {
     lines.push("");
     lines.push(`⛽ <b>霍尔木兹海峡</b>`);
-    lines.push(analysis.hormuzStrait);
+    lines.push(escapeHtml(analysis.hormuzStrait));
   }
   if (analysis.stockTopicsAnalysis) {
     lines.push("");
     lines.push(`📊 <b>美股标的动态</b>`);
-    lines.push(analysis.stockTopicsAnalysis);
+    lines.push(escapeHtml(analysis.stockTopicsAnalysis));
   }
   if (analysis.cryptoTopicsAnalysis) {
     lines.push("");
     lines.push(`🪙 <b>加密标的动态</b>`);
-    lines.push(analysis.cryptoTopicsAnalysis);
+    lines.push(escapeHtml(analysis.cryptoTopicsAnalysis));
   }
 
   // ---- 持仓快览 ----
@@ -188,8 +196,8 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     // Telegram 消息字数有限，取前 5 条
     const topItems = analysis.topNews.slice(0, 5);
     topItems.forEach((n, i) => {
-      lines.push(`${i + 1}. [${n.tag}] <a href="${n.url}">${n.title}</a>`);
-      if (n.action) lines.push(`   👉 ${n.action}`);
+      lines.push(`${i + 1}. [${escapeHtml(n.tag)}] <a href="${n.url}">${escapeHtml(n.title)}</a>`);
+      if (n.action) lines.push(`   👉 ${escapeHtml(n.action)}`);
     });
     if (analysis.topNews.length > 5) {
       lines.push(`  ...更多新闻请访问网站`);
