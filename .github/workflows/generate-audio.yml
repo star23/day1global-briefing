@@ -12,6 +12,16 @@ on:
         required: false
         type: boolean
         default: false
+      telegram_audio_only:
+        description: '只推送音频（跳过文字）'
+        required: false
+        type: boolean
+        default: false
+      telegram_text_only:
+        description: '只推送文字（跳过音频）'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   daily-briefing:
@@ -36,7 +46,13 @@ jobs:
         run: |
           ARGS=""
           if [ "${{ inputs.skip_telegram }}" = "true" ]; then
-            ARGS="--skip-telegram"
+            ARGS="$ARGS --skip-telegram"
+          fi
+          if [ "${{ inputs.telegram_audio_only }}" = "true" ]; then
+            ARGS="$ARGS --telegram-audio-only"
+          fi
+          if [ "${{ inputs.telegram_text_only }}" = "true" ]; then
+            ARGS="$ARGS --telegram-text-only"
           fi
           npx tsx scripts/daily-briefing.ts $ARGS
         env:
