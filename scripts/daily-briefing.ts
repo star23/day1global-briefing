@@ -20,12 +20,16 @@ import { put } from "@vercel/blob";
 
 const BASE_URL = process.env.BRIEFING_BASE_URL || "https://brief.day1global.xyz";
 const skipTelegram = process.argv.includes("--skip-telegram");
+const telegramAudioOnly = process.argv.includes("--telegram-audio-only");
+const telegramTextOnly = process.argv.includes("--telegram-text-only");
 
 async function main() {
   console.log("=== Day1Global 每日早报生成 ===");
   console.log(`时间: ${new Date().toISOString()}`);
   console.log(`Dashboard: ${BASE_URL}`);
   if (skipTelegram) console.log("⚠ 跳过 Telegram 推送 (--skip-telegram)");
+  if (telegramAudioOnly) console.log("⚠ 只推送音频 (--telegram-audio-only)");
+  if (telegramTextOnly) console.log("⚠ 只推送文字 (--telegram-text-only)");
   console.log("");
 
   // 检查必需的环境变量
@@ -136,16 +140,24 @@ async function main() {
     console.log("[7/7] 推送到 Telegram...");
 
     // 先推音频
-    if (audioBuffer) {
-      const audioPushed = await pushTelegramAudio(audioBuffer);
-      console.log(audioPushed ? "  ✓ 音频推送成功" : "  ✗ 音频推送失败");
+    if (!telegramTextOnly) {
+      if (audioBuffer) {
+        const audioPushed = await pushTelegramAudio(audioBuffer);
+        console.log(audioPushed ? "  ✓ 音频推送成功" : "  ✗ 音频推送失败");
+      } else {
+        console.log("  - 无音频，跳过音频推送");
+      }
     } else {
-      console.log("  - 无音频，跳过音频推送");
+      console.log("  - 只推文字模式，跳过音频推送");
     }
 
     // 再推文字
-    const textPushed = await pushTelegramBriefing(data, analysis);
-    console.log(textPushed ? "  ✓ 文字推送成功" : "  ✗ 文字推送失败");
+    if (!telegramAudioOnly) {
+      const textPushed = await pushTelegramBriefing(data, analysis);
+      console.log(textPushed ? "  ✓ 文字推送成功" : "  ✗ 文字推送失败");
+    } else {
+      console.log("  - 只推音频模式，跳过文字推送");
+    }
   } else if (skipTelegram) {
     console.log("[7/7] 跳过 Telegram 推送");
   } else {
