@@ -118,6 +118,7 @@ async function main() {
           access: "public",
           contentType: "audio/mpeg",
           addRandomSuffix: false,
+          allowOverwrite: true,
         });
         await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
         console.log(`  ✓ Blob URL: ${blob.url}`);
