@@ -519,6 +519,32 @@ export default function MorningBriefing() {
                 )}
                 {audioState === "loading" ? "加载中" : audioState === "playing" ? "暂停" : audioState === "paused" ? "继续播放" : audioState === "error" ? "音频不可用" : "听早报"}
               </button>
+              <a
+                href="/api/audio?download=1"
+                download
+                title="下载音频早报 MP3"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid #334155",
+                  borderRadius: 16,
+                  padding: "2px 10px",
+                  color: COLORS.muted,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  transition: "all 0.2s",
+                  textDecoration: "none",
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                下载
+              </a>
             </div>
             <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 4 }}>
               {dateStr}
