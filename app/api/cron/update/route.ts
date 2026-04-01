@@ -11,6 +11,7 @@ import { fetchGeopoliticalNews } from "@/lib/fetch-geopolitical-news";
 import { pushTelegramBriefing } from "@/lib/telegram";
 import { MarketDataResponse } from "@/lib/types";
 import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "@/lib/db";
+import { getTodayBeijing } from "@/lib/date-utils";
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     try {
       await ensureTable();
       await migrateAddColumns();
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = getTodayBeijing();
       await upsertDailyMetrics({
         date: today,
         btcPrice: data.crypto?.BTC?.price ?? null,

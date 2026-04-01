@@ -17,6 +17,7 @@ import { generateTTSAudio } from "../lib/tts";
 import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "../lib/db";
 import { Redis } from "@upstash/redis";
 import { put } from "@vercel/blob";
+import { getTodayBeijing } from "../lib/date-utils";
 
 const BASE_URL = process.env.BRIEFING_BASE_URL || "https://brief.day1global.xyz";
 const skipTelegram = process.argv.includes("--skip-telegram");
@@ -61,7 +62,7 @@ async function main() {
   try {
     await ensureTable();
     await migrateAddColumns();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayBeijing();
     await upsertDailyMetrics({
       date: today,
       btcPrice: data.crypto?.BTC?.price ?? null,
@@ -117,7 +118,7 @@ async function main() {
       console.log(`  ✓ 音频大小: ${sizeMB} MB`);
 
       if (process.env.BLOB_READ_WRITE_TOKEN) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getTodayBeijing();
         const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
           access: "public",
           contentType: "audio/mpeg",

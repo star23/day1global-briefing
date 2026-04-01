@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { list } from "@vercel/blob";
+import { getTodayBeijing } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +23,9 @@ async function findAudioUrl(): Promise<string | null> {
 
   // 2. Redis 缓存过期，从 Vercel Blob 按日期查找
   // 先查今天，再查昨天（处理时区差异）
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = getTodayBeijing();
+  const yesterdayDate = new Date(Date.now() + 8 * 60 * 60 * 1000 - 86400000);
+  const yesterday = yesterdayDate.toISOString().slice(0, 10);
 
   for (const date of [today, yesterday]) {
     const result = await list({ prefix: `briefing-audio/${date}` });
@@ -53,7 +55,7 @@ export async function GET(request: NextRequest) {
     // 支持下载模式
     const isDownload = request.nextUrl.searchParams.get("download") === "1";
     if (isDownload) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getTodayBeijing();
       const filename = `day1global-briefing-${today}.mp3`;
       return new NextResponse(null, {
         status: 302,
