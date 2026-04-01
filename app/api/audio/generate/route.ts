@@ -8,6 +8,7 @@ import { Redis } from "@upstash/redis";
 import { put } from "@vercel/blob";
 import { generateTTSAudio } from "@/lib/tts";
 import { AIAnalysis, MarketDataResponse } from "@/lib/types";
+import { getTodayBeijing } from "@/lib/date-utils";
 
 export const maxDuration = 300; // TTS 生成可能较慢，允许 5 分钟
 
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     const audioBuffer = await generateTTSAudio(data, analysis);
 
     // 上传到 Vercel Blob
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayBeijing();
     const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
       access: "public",
       contentType: "audio/mpeg",
