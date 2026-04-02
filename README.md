@@ -6,6 +6,8 @@ A real-time daily investment intelligence dashboard for US stocks, crypto, and m
 
 **Live Demo: [brief.day1global.xyz](https://brief.day1global.xyz/)**
 
+![Dashboard & Telegram](docs/screenshot.png)
+
 [English](#english) | [中文](#中文)
 
 ---
