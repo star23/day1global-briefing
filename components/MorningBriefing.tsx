@@ -93,7 +93,8 @@ const TABS = [
 // ---- 股票/加密元数据 ----
 const STOCK_META: Record<string, { name: string; note: string }> = {
   VOO: { name: "S&P 500 ETF", note: "标普500指数ETF，核心配置" },
-  QQQM: { name: "Nasdaq 100 ETF", note: "纳指100 ETF，科技股核心" },
+  QQQ: { name: "Nasdaq 100 ETF", note: "纳指100 ETF，流动性最佳" },
+  QQQM: { name: "Nasdaq 100 ETF", note: "纳指100 ETF Mini，费率更低适合长持" },
   NVDA: { name: "英伟达", note: "AI算力龙头，关注财报与Blackwell出货" },
   TSLA: { name: "特斯拉", note: "Physical AI/机器人叙事" },
   GOOG: { name: "Alphabet", note: "AI搜索+云增长，估值相对合理" },
