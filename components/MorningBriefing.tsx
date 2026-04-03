@@ -630,8 +630,8 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
   if (data?.stocks?.VOO) {
     indices.push({ name: "VOO (S&P500)", val: `$${formatPrice(data.stocks.VOO.price)}`, chg: formatChange(data.stocks.VOO.changePercent), color: getChangeColor(data.stocks.VOO.changePercent) });
   }
-  if (data?.stocks?.QQQM) {
-    indices.push({ name: "QQQM (Nasdaq)", val: `$${formatPrice(data.stocks.QQQM.price)}`, chg: formatChange(data.stocks.QQQM.changePercent), color: getChangeColor(data.stocks.QQQM.changePercent) });
+  if (data?.stocks?.QQQ) {
+    indices.push({ name: "QQQ (Nasdaq)", val: `$${formatPrice(data.stocks.QQQ.price)}`, chg: formatChange(data.stocks.QQQ.changePercent), color: getChangeColor(data.stocks.QQQ.changePercent) });
   }
   if (data?.indices?.sp500) {
     indices.push({ name: "S&P 500", val: formatPrice(data.indices.sp500.price), chg: formatChange(data.indices.sp500.changePercent), color: getChangeColor(data.indices.sp500.changePercent) });
