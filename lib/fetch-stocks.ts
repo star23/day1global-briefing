@@ -120,7 +120,28 @@ async function fetchYahooSymbol(
   }
 }
 
-/** 获取指数数据（S&P 500、VIX、黄金现货 XAU/USD、原油、美元指数） */
+/** 从 OKX 获取 XAUT (Tether Gold) 价格作为黄金代理 */
+async function fetchXAUT(): Promise<{ price: number; changePercent: number } | null> {
+  try {
+    const url = "https://www.okx.com/api/v5/market/ticker?instId=XAUT-USDT";
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.code !== "0" || !data.data?.[0]) return null;
+    const ticker = data.data[0];
+    const last = parseFloat(ticker.last);
+    const open24h = parseFloat(ticker.open24h);
+    const changePercent = open24h > 0 ? ((last - open24h) / open24h) * 100 : 0;
+    return { price: last, changePercent };
+  } catch {
+    return null;
+  }
+}
+
+/** 获取指数数据（S&P 500、VIX、黄金 XAUT、原油、美元指数） */
 export async function fetchIndices(): Promise<{
   sp500: IndexData | null;
   vix: IndexData | null;
@@ -131,7 +152,7 @@ export async function fetchIndices(): Promise<{
   const [sp500Data, vixData, goldData, oilData, dxyData] = await Promise.all([
     fetchYahooSymbol("^GSPC"),
     fetchYahooSymbol("^VIX"),
-    fetchYahooSymbol("XAUUSD=X"),
+    fetchXAUT(),
     fetchYahooSymbol("CL=F"),
     fetchYahooSymbol("DX-Y.NYB"),
   ]);

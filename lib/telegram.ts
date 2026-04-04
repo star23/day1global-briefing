@@ -103,7 +103,7 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     lines.push(`  VIX: ${fmtPrice(data.indices.vix.price)} ${fmtChange(data.indices.vix.changePercent)}`);
   }
   if (data.indices.gold.price) {
-    lines.push(`  Gold: $${fmtPrice(data.indices.gold.price)} ${fmtChange(data.indices.gold.changePercent)}`);
+    lines.push(`  Gold (XAUT): $${fmtPrice(data.indices.gold.price)} ${fmtChange(data.indices.gold.changePercent)}`);
   }
   if (data.indices.crudeOil?.price) {
     lines.push(`  Crude Oil: $${fmtPrice(data.indices.crudeOil.price)} ${fmtChange(data.indices.crudeOil.changePercent)}`);
