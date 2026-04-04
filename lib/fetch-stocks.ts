@@ -1,6 +1,6 @@
 // ========== 获取美股数据 ==========
 // 股票报价使用 Finnhub API（需要免费 API Key）
-// VIX 等指数仍使用 Yahoo Finance；黄金现货 XAU/USD 使用 Finnhub (OANDA:XAU_USD)
+// VIX、黄金现货 (XAUUSD=X) 等指数/商品仍使用 Yahoo Finance
 
 import { StockData, IndexData } from "./types";
 
@@ -86,42 +86,7 @@ export async function fetchAllStocks(): Promise<{
   return results;
 }
 
-// ---- VIX 等指数：仍使用 Yahoo Finance；黄金现货使用 Finnhub Forex API ----
-
-/** 从 Finnhub Forex Candles 获取外汇/贵金属现货价格（如 OANDA:XAU_USD） */
-async function fetchFinnhubForexQuote(
-  symbol: string
-): Promise<{ price: number; changePercent: number } | null> {
-  try {
-    // 取最近 2 天的日线，用于计算涨跌幅
-    const now = Math.floor(Date.now() / 1000);
-    const from = now - 3 * 24 * 60 * 60; // 3 天前（确保覆盖周末）
-    const url = `https://finnhub.io/api/v1/forex/candles?symbol=${encodeURIComponent(symbol)}&resolution=D&from=${from}&to=${now}&token=${FINNHUB_API_KEY}`;
-    const res = await fetch(url, { cache: "no-store" });
-
-    if (!res.ok) {
-      console.error(`Finnhub Forex 请求失败 [${symbol}]: ${res.status}`);
-      return null;
-    }
-
-    const data = await res.json();
-
-    if (data.s !== "ok" || !data.c || data.c.length === 0) {
-      console.error(`Finnhub Forex 无数据 [${symbol}]:`, data.s);
-      return null;
-    }
-
-    const closes = data.c as number[];
-    const price = closes[closes.length - 1]; // 最新收盘价
-    const prevClose = closes.length >= 2 ? closes[closes.length - 2] : price;
-    const changePercent = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
-
-    return { price, changePercent };
-  } catch (err) {
-    console.error(`获取 ${symbol} Forex 数据出错:`, err);
-    return null;
-  }
-}
+// ---- VIX、黄金现货等：使用 Yahoo Finance ----
 
 /** 从 Yahoo Finance 获取单个指数/商品数据 */
 async function fetchYahooSymbol(
@@ -166,7 +131,7 @@ export async function fetchIndices(): Promise<{
   const [sp500Data, vixData, goldData, oilData, dxyData] = await Promise.all([
     fetchYahooSymbol("^GSPC"),
     fetchYahooSymbol("^VIX"),
-    fetchFinnhubForexQuote("OANDA:XAU_USD"),
+    fetchYahooSymbol("XAUUSD=X"),
     fetchYahooSymbol("CL=F"),
     fetchYahooSymbol("DX-Y.NYB"),
   ]);
