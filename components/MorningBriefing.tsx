@@ -1678,7 +1678,7 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
           )}
           {data?.indices?.gold && (
             <div style={{ background: COLORS.dimBg, borderRadius: 8, padding: 14, textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: COLORS.muted }}>黄金 (GC=F)</div>
+              <div style={{ fontSize: 10, color: COLORS.muted }}>黄金现货 (XAU/USD)</div>
               <div style={{ fontSize: 22, fontWeight: 900, color: COLORS.gold }}>
                 ${formatPrice(data.indices.gold.price)}
               </div>
