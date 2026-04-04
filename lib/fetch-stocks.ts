@@ -1,6 +1,6 @@
 // ========== 获取美股数据 ==========
 // 股票报价使用 Finnhub API（需要免费 API Key）
-// VIX 等指数仍使用 Yahoo Finance；黄金现货 XAU/USD 使用 Finnhub (OANDA:XAU_USD)
+// VIX、黄金现货 (XAUUSD=X) 等指数/商品仍使用 Yahoo Finance
 
 import { StockData, IndexData } from "./types";
 
@@ -86,7 +86,7 @@ export async function fetchAllStocks(): Promise<{
   return results;
 }
 
-// ---- VIX 等指数：仍使用 Yahoo Finance；黄金现货使用 Finnhub (OANDA:XAU_USD) ----
+// ---- VIX、黄金现货等：使用 Yahoo Finance ----
 
 /** 从 Yahoo Finance 获取单个指数/商品数据 */
 async function fetchYahooSymbol(
@@ -131,7 +131,7 @@ export async function fetchIndices(): Promise<{
   const [sp500Data, vixData, goldData, oilData, dxyData] = await Promise.all([
     fetchYahooSymbol("^GSPC"),
     fetchYahooSymbol("^VIX"),
-    fetchFinnhubQuote("OANDA:XAU_USD"),
+    fetchYahooSymbol("XAUUSD=X"),
     fetchYahooSymbol("CL=F"),
     fetchYahooSymbol("DX-Y.NYB"),
   ]);
