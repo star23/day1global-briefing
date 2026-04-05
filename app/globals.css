@@ -22,6 +22,17 @@
   --gradient-header: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
 }
 
+/* 浅色模式 */
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-card: #ffffff;
+  --border-color: #e2e8f0;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --gradient-header: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
