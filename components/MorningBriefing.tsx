@@ -11,7 +11,7 @@ import { calculateMarketRating } from "@/lib/market-rating";
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 // ---- 颜色系统 ----
-const COLORS = {
+const DARK_COLORS = {
   bg: "#0a0e17",
   card: "#111827",
   cardBorder: "#1e293b",
@@ -26,6 +26,24 @@ const COLORS = {
   muted: "#94a3b8",
   dimBg: "#1e293b",
 };
+
+const LIGHT_COLORS = {
+  bg: "#f8fafc",
+  card: "#ffffff",
+  cardBorder: "#e2e8f0",
+  accent: "#3b82f6",
+  green: "#059669",
+  red: "#dc2626",
+  yellow: "#d97706",
+  orange: "#ea580c",
+  purple: "#7c3aed",
+  gold: "#b8860b",
+  text: "#1e293b",
+  muted: "#64748b",
+  dimBg: "#e2e8f0",
+};
+
+let COLORS = DARK_COLORS;
 
 // ---- 辅助函数 ----
 
@@ -293,7 +311,7 @@ function Skeleton({ width, height }: { width?: string; height?: string }) {
       style={{
         width: width || "100%",
         height: height || "20px",
-        background: "linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%)",
+        background: `linear-gradient(90deg, ${COLORS.dimBg} 25%, ${COLORS.cardBorder} 50%, ${COLORS.dimBg} 75%)`,
         backgroundSize: "200% 100%",
         animation: "shimmer 1.5s infinite",
         borderRadius: "4px",
@@ -321,8 +339,22 @@ function LoadingState() {
 // ========== 主组件 ==========
 export default function MorningBriefing() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "dark" | "light") || "dark";
+    }
+    return "dark";
+  });
   const [audioState, setAudioState] = useState<"idle" | "loading" | "playing" | "paused" | "error">("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 切换主题
+  COLORS = theme === "light" ? LIGHT_COLORS : DARK_COLORS;
+
+  useEffect(() => {
+    localStorage.setItem("theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   const { data, error, isLoading } = useSWR<MarketDataResponse>(
     "/api/market-data",
@@ -420,7 +452,9 @@ export default function MorningBriefing() {
       {/* ---- Header ---- */}
       <div
         style={{
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+          background: theme === "dark"
+            ? "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)"
+            : "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
           padding: "24px 20px 16px",
           borderBottom: `1px solid ${COLORS.cardBorder}`,
         }}
@@ -497,8 +531,8 @@ export default function MorningBriefing() {
                 onClick={toggleAudio}
                 title={audioState === "playing" ? "暂停音频早报" : "收听音频早报"}
                 style={{
-                  background: audioState === "playing" ? "rgba(99, 102, 241, 0.2)" : "rgba(255,255,255,0.05)",
-                  border: `1px solid ${audioState === "playing" ? "#6366f1" : "#334155"}`,
+                  background: audioState === "playing" ? "rgba(99, 102, 241, 0.2)" : (COLORS.bg === "#0a0e17" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"),
+                  border: `1px solid ${audioState === "playing" ? "#6366f1" : COLORS.cardBorder}`,
                   borderRadius: 16,
                   padding: "2px 10px",
                   color: audioState === "playing" ? "#818cf8" : audioState === "error" ? COLORS.red : COLORS.muted,
@@ -528,8 +562,8 @@ export default function MorningBriefing() {
                 download
                 title="下载音频早报 MP3"
                 style={{
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid #334155",
+                  background: COLORS.bg === "#0a0e17" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                  border: `1px solid ${COLORS.cardBorder}`,
                   borderRadius: 16,
                   padding: "2px 10px",
                   color: COLORS.muted,
@@ -564,15 +598,36 @@ export default function MorningBriefing() {
               </div>
             )}
           </div>
-          {headerBadges.length > 0 && (
-            <div style={{ textAlign: "right" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+            {/* 主题切换 */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+              style={{
+                background: theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                border: `1px solid ${COLORS.cardBorder}`,
+                borderRadius: 20,
+                padding: "6px 12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                color: COLORS.muted,
+                transition: "all 0.2s",
+              }}
+            >
+              {theme === "dark" ? "☀️" : "🌙"}
+              <span>{theme === "dark" ? "浅色" : "深色"}</span>
+            </button>
+            {headerBadges.length > 0 && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 {headerBadges.map((b, i) => (
                   <Badge key={i} color={b.color}>{b.text}</Badge>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
