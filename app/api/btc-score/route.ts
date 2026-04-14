@@ -72,11 +72,7 @@ export async function GET() {
     const result = {
       timestamp: new Date().toISOString(),
       btcPrice,
-      // 贪婪视角（0=极度恐慌, 100=极度贪婪）— calculateMarketRating 原始输出
-      heatScore: rating.totalScore,
-      dailyHeatScore: rating.dailyScore,
-      weeklyHeatScore: rating.weeklyScore,
-      // 抄底视角（0=不适合买, 100=极度适合买）— 与页面展示一致
+      // 抄底视角分数（与页面展示一致）：0=不适合买, 100=极度适合买
       score: Math.round((100 - rating.totalScore) * 10) / 10,
       dailyScore: Math.round((32 - rating.dailyScore) * 10) / 10,
       weeklyScore: Math.round((68 - rating.weeklyScore) * 10) / 10,
