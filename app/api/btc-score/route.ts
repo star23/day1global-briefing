@@ -72,10 +72,10 @@ export async function GET() {
     const result = {
       timestamp: new Date().toISOString(),
       btcPrice,
-      // 抄底视角分数（与页面展示一致）：0=不适合买, 100=极度适合买
-      score: Math.round((100 - rating.totalScore) * 10) / 10,
-      dailyScore: Math.round((32 - rating.dailyScore) * 10) / 10,
-      weeklyScore: Math.round((68 - rating.weeklyScore) * 10) / 10,
+      // 市场热度分数（0=极度恐慌/抄底, 100=极度贪婪/逃顶）
+      score: rating.totalScore,
+      dailyScore: rating.dailyScore,
+      weeklyScore: rating.weeklyScore,
       level: rating.level,
       suggestion: rating.suggestion,
       indicators: rating.indicators,
