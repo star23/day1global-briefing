@@ -65,11 +65,20 @@ export async function GET() {
       sentiment.cryptoFearGreed ?? null
     );
 
+    // 添加抄底视角分数（与页面展示一致）
+    const response = {
+      ...rating,
+      // 抄底视角（0=不适合买, 100=极度适合买）
+      buyScore: Math.round((100 - rating.totalScore) * 10) / 10,
+      dailyBuyScore: Math.round((32 - rating.dailyScore) * 10) / 10,
+      weeklyBuyScore: Math.round((68 - rating.weeklyScore) * 10) / 10,
+    };
+
     // 更新缓存
     cachedRating = rating;
     cacheTimestamp = now;
 
-    return NextResponse.json(rating, {
+    return NextResponse.json(response, {
       headers: {
         "Cache-Control": "s-maxage=120, stale-while-revalidate=300",
       },
