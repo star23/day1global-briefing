@@ -1393,12 +1393,12 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
   const rating: MarketRating | null = metrics
     ? calculateMarketRating(metrics, fearGreed)
     : null;
-  // 转换为抄底视角分数（100-逃顶分=抄底分）
-  const avgScore = rating ? 100 - rating.totalScore : 0;
+  // 原始分数：0=极度恐慌(抄底), 100=极度贪婪(逃顶)
+  const totalScore = rating?.totalScore ?? 0;
   const scoreLabel = rating?.level ?? "数据不足";
-  // 颜色：抄底视角 - 逃顶=红色, 恐慌=绿色
+  // 颜色：低分(恐慌)=绿色, 高分(贪婪)=红色
   const scoreColor = rating
-    ? (rating.totalScore <= 30 ? COLORS.green : rating.totalScore <= 45 ? COLORS.green : rating.totalScore <= 55 ? COLORS.yellow : rating.totalScore <= 70 ? COLORS.orange : COLORS.red)
+    ? (totalScore <= 30 ? COLORS.green : totalScore <= 45 ? COLORS.green : totalScore <= 55 ? COLORS.yellow : totalScore <= 70 ? COLORS.orange : COLORS.red)
     : COLORS.muted;
 
   return (
@@ -1421,7 +1421,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         </div>
 
         {/* 每日关注 */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {(32 - rating.dailyScore).toFixed(1)}</span>}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {rating.dailyScore.toFixed(1)}</span>}</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "22%" }} />
@@ -1454,7 +1454,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         </table>
 
         {/* 每周关注 */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.purple, margin: "16px 0 4px 0" }}>每周关注（链上基本面 / 技术动能）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {(68 - rating.weeklyScore).toFixed(1)}</span>}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.purple, margin: "16px 0 4px 0" }}>每周关注（链上基本面 / 技术动能）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {rating.weeklyScore.toFixed(1)}</span>}</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "22%" }} />
@@ -1551,16 +1551,16 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
       <Card title="综合抄底/逃顶评级" icon="🚦" accent={COLORS.orange}>
         <div style={{ textAlign: "center", margin: "8px 0" }}>
           <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor }}>
-            {rating ? (rating.totalScore <= 30 ? "🟢 " : rating.totalScore <= 55 ? "🟡 " : "🔴 ") : "⚪ "}{scoreLabel}
+            {rating ? (totalScore <= 30 ? "🟢 " : totalScore <= 55 ? "🟡 " : "🔴 ") : "⚪ "}{scoreLabel}
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor }}>{rating ? `${avgScore} / 100` : "N/A"}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor }}>{rating ? `${totalScore} / 100` : "N/A"}</div>
           <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>
-            加权综合评分（0=逃顶, 100=抄底）
+            加权综合评分（0=抄底, 100=逃顶）
           </div>
           {rating && (
             <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8, fontSize: 11 }}>
-              <span style={{ color: COLORS.accent }}>每日: {(32 - rating.dailyScore).toFixed(1)} / 32</span>
-              <span style={{ color: COLORS.purple }}>每周: {(68 - rating.weeklyScore).toFixed(1)} / 68</span>
+              <span style={{ color: COLORS.accent }}>每日: {rating.dailyScore.toFixed(1)} / 32</span>
+              <span style={{ color: COLORS.purple }}>每周: {rating.weeklyScore.toFixed(1)} / 68</span>
             </div>
           )}
           <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
@@ -1577,7 +1577,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         {/* 评分刻度条 */}
         {rating && (
           <div style={{ position: "relative", height: 28, background: COLORS.dimBg, borderRadius: 6, overflow: "hidden", margin: "12px 0 4px" }}>
-            <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to right, ${COLORS.red}66, ${COLORS.yellow}44 50%, ${COLORS.green}66)`, borderRadius: 6 }} />
+            <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to right, ${COLORS.green}66, ${COLORS.yellow}44 50%, ${COLORS.red}66)`, borderRadius: 6 }} />
             {[20, 40, 60, 80].map((tick) => (
               <div key={tick} style={{ position: "absolute", left: `${tick}%`, top: 0, bottom: 0, width: 1, background: `${COLORS.muted}44` }}>
                 <span style={{ position: "absolute", top: -12, left: -6, fontSize: 8, color: COLORS.muted }}>{tick}</span>
@@ -1585,7 +1585,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
             ))}
             <div style={{
               position: "absolute",
-              left: `${Math.min(Math.max(avgScore, 0), 100)}%`,
+              left: `${Math.min(Math.max(totalScore, 0), 100)}%`,
               top: 3, bottom: 3,
               width: 6, borderRadius: 3,
               background: scoreColor,
