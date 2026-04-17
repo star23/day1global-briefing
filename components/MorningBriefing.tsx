@@ -122,6 +122,9 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   COIN: { name: "Coinbase", note: "加密交易所龙头" },
   TEM: { name: "Tempus AI", note: "AI医疗诊断平台，精准医疗赛道" },
   GLD: { name: "SPDR黄金ETF", note: "全球最大黄金ETF，避险核心配置" },
+  SMH: { name: "半导体ETF", note: "VanEck半导体ETF，AI芯片赛道核心配置" },
+  DRAM: { name: "内存半导体ETF", note: "Roundhill DRAM ETF，HBM/内存芯片主题" },
+  CHAT: { name: "AI聊天机器人ETF", note: "Roundhill生成式AI & 技术ETF" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {
