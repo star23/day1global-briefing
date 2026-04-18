@@ -93,7 +93,7 @@ async function fetchYahooSymbol(
   symbol: string
 ): Promise<{ price: number; changePercent: number } | null> {
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
     const res = await fetch(url, {
       cache: 'no-store',
       headers: {
@@ -109,9 +109,7 @@ async function fetchYahooSymbol(
     if (!meta) return null;
 
     const price = meta.regularMarketPrice ?? 0;
-    // 优先用 previousClose（前一交易日收盘价），fallback 到 chartPreviousClose
-    // 注意：chartPreviousClose 是 chart range 起点的收盘价（5天前），不是昨日收盘
-    const prevClose = meta.previousClose ?? meta.chartPreviousClose;
+    const prevClose = meta.chartPreviousClose;
     const changePercent = prevClose > 0
       ? ((price - prevClose) / prevClose) * 100
       : 0;
