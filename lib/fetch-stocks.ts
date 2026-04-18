@@ -108,13 +108,15 @@ async function fetchYahooSymbol(
     const meta = data?.chart?.result?.[0]?.meta;
     if (!meta) return null;
 
-    return {
-      price: meta.regularMarketPrice ?? 0,
-      changePercent:
-        ((meta.regularMarketPrice - meta.chartPreviousClose) /
-          meta.chartPreviousClose) *
-        100,
-    };
+    const price = meta.regularMarketPrice ?? 0;
+    // 优先用 previousClose（前一交易日收盘价），fallback 到 chartPreviousClose
+    // 注意：chartPreviousClose 是 chart range 起点的收盘价（5天前），不是昨日收盘
+    const prevClose = meta.previousClose ?? meta.chartPreviousClose;
+    const changePercent = prevClose > 0
+      ? ((price - prevClose) / prevClose) * 100
+      : 0;
+
+    return { price, changePercent };
   } catch {
     return null;
   }
