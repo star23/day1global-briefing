@@ -125,6 +125,7 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   SMH: { name: "半导体ETF", note: "VanEck半导体ETF，AI芯片赛道核心配置" },
   DRAM: { name: "内存半导体ETF", note: "Roundhill DRAM ETF，HBM/内存芯片主题" },
   CHAT: { name: "AI聊天机器人ETF", note: "Roundhill生成式AI & 技术ETF" },
+  KTOS: { name: "Kratos Defense", note: "无人机/高超音速/靶机，国防科技赛道" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {
