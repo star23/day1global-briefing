@@ -126,6 +126,9 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   DRAM: { name: "内存半导体ETF", note: "Roundhill DRAM ETF，HBM/内存芯片主题" },
   CHAT: { name: "AI聊天机器人ETF", note: "Roundhill生成式AI & 技术ETF" },
   KTOS: { name: "Kratos Defense", note: "无人机/高超音速/靶机，国防科技赛道" },
+  RVI: { name: "Revvity", note: "生命科学/诊断平台，精准医疗赛道" },
+  VCX: { name: "Vanguard Conservative ETF", note: "Vanguard保守型配置ETF" },
+  DXYZ: { name: "Destiny Tech100", note: "封闭式基金，投资SpaceX/OpenAI等未上市科技独角兽" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {
