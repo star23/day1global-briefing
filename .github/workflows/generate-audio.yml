@@ -1,9 +1,9 @@
 name: Daily Briefing
 
 on:
-  # 每天 UTC 23:00 运行
+  # 每天 UTC 22:30（北京时间 06:30）运行
   schedule:
-    - cron: '0 23 * * *'
+    - cron: '30 22 * * *'
   # 手动触发（GitHub Actions 页面点 "Run workflow"）
   workflow_dispatch:
     inputs:

@@ -125,6 +125,10 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   SMH: { name: "半导体ETF", note: "VanEck半导体ETF，AI芯片赛道核心配置" },
   DRAM: { name: "内存半导体ETF", note: "Roundhill DRAM ETF，HBM/内存芯片主题" },
   CHAT: { name: "AI聊天机器人ETF", note: "Roundhill生成式AI & 技术ETF" },
+  KTOS: { name: "Kratos Defense", note: "无人机/高超音速/靶机，国防科技赛道" },
+  RVI: { name: "Robinhood Ventures Fund I", note: "Robinhood私募基金，投资未上市独角兽" },
+  VCX: { name: "Fundrise Innovation Fund", note: "Fundrise科技创新基金，投资未上市科技公司" },
+  DXYZ: { name: "Destiny Tech100", note: "封闭式基金，投资SpaceX/OpenAI等未上市科技独角兽" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {
