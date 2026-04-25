@@ -1156,6 +1156,203 @@ function HistoryComparisonCard({
   );
 }
 
+// ========== LTH 7日净持仓变化图表 ==========
+interface LTHNetPositionPoint {
+  date: string;
+  price: number;
+  supply: number;
+  netChange7d: number | null;
+}
+
+function LTHNetPositionChart() {
+  const { data } = useSWR<LTHNetPositionPoint[]>(
+    "/api/lth-net-position",
+    fetcher,
+    { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
+  );
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据加载中...</div>
+      </Card>
+    );
+  }
+
+  // 只取有 netChange7d 的数据点
+  const chartData = data.filter((d) => d.netChange7d !== null);
+  if (chartData.length === 0) {
+    return (
+      <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据不足</div>
+      </Card>
+    );
+  }
+
+  // 图表尺寸
+  const W = 820, H = 260;
+  const padL = 55, padR = 15, padT = 20, padB = 30;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  // 数据范围
+  const prices = chartData.map((d) => d.price);
+  const nets = chartData.map((d) => d.netChange7d!);
+  const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  const nMax = Math.max(...nets.map(Math.abs), 1);
+
+  const barW = Math.max(1, (chartW / chartData.length) * 0.7);
+  const gap = chartW / chartData.length;
+
+  // 价格折线坐标
+  const priceLine = chartData.map((d, i) => {
+    const x = padL + i * gap + gap / 2;
+    const y = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
+    return `${x},${y}`;
+  }).join(" ");
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    const idx = Math.floor((x - padL) / gap);
+    if (idx >= 0 && idx < chartData.length) setHoverIdx(idx);
+    else setHoverIdx(null);
+  };
+
+  const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
+
+  return (
+    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>长期持有者净持仓变化<InfoTooltip text="LTH 7日净持仓 = 今日 LTH Supply - 7天前 LTH Supply\n正值(绿色) = 长期持有者在增持\n负值(红色) = 长期持有者在减持\n灰色折线 = BTC价格" /></span>} icon="📊" accent={COLORS.accent}>
+      {/* Tooltip */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: 20, marginBottom: 4 }}>
+        {hovered ? (
+          <div style={{ fontSize: 11, color: COLORS.muted, display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <span>{hovered.date}</span>
+            <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${hovered.price.toLocaleString()}</span></span>
+            <span>LTH 7日净持仓: <span style={{ color: hovered.netChange7d! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{hovered.netChange7d! >= 0 ? "+" : ""}{hovered.netChange7d!.toLocaleString()} BTC</span></span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: COLORS.muted }}>最近 {chartData.length} 天 · 鼠标悬停查看详情</div>
+        )}
+        <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 8, height: 8, background: COLORS.green + "88", display: "inline-block", borderRadius: 1 }} /> 增持
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 8, height: 8, background: COLORS.red + "88", display: "inline-block", borderRadius: 1 }} /> 减持
+          </span>
+        </div>
+      </div>
+
+      {/* SVG 图表 */}
+      <div style={{ width: "100%", overflowX: "auto" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width: "100%", height: "auto", display: "block", cursor: "crosshair" }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          {/* 柱状图：LTH 7日净持仓 */}
+          {chartData.map((d, i) => {
+            const net = d.netChange7d!;
+            const barH = (Math.abs(net) / nMax) * (chartH / 2);
+            const x = padL + i * gap + (gap - barW) / 2;
+            const midY = padT + chartH / 2;
+            const isPositive = net >= 0;
+            const y = isPositive ? midY - barH : midY;
+            const opacity = hoverIdx !== null && hoverIdx !== i ? 0.35 : 0.7;
+
+            return (
+              <rect
+                key={i}
+                x={x}
+                y={y}
+                width={barW}
+                height={Math.max(barH, 0.5)}
+                fill={isPositive ? COLORS.green : COLORS.red}
+                opacity={opacity}
+                rx={1}
+              />
+            );
+          })}
+
+          {/* 零线 */}
+          <line
+            x1={padL} y1={padT + chartH / 2}
+            x2={padL + chartW} y2={padT + chartH / 2}
+            stroke={COLORS.muted} strokeWidth={0.5} strokeDasharray="4,3" opacity={0.4}
+          />
+
+          {/* BTC 价格折线 */}
+          <polyline
+            points={priceLine}
+            fill="none"
+            stroke={COLORS.muted}
+            strokeWidth={1.5}
+            opacity={0.6}
+          />
+
+          {/* 悬停竖线 */}
+          {hoverIdx !== null && (
+            <>
+              <line
+                x1={padL + hoverIdx * gap + gap / 2}
+                y1={padT}
+                x2={padL + hoverIdx * gap + gap / 2}
+                y2={padT + chartH}
+                stroke={COLORS.accent}
+                strokeWidth={0.8}
+                strokeDasharray="3,3"
+                opacity={0.6}
+              />
+              <circle
+                cx={padL + hoverIdx * gap + gap / 2}
+                cy={padT + chartH - ((chartData[hoverIdx].price - pMin) / (pMax - pMin || 1)) * chartH}
+                r={3}
+                fill={COLORS.accent}
+                stroke={COLORS.card}
+                strokeWidth={1.5}
+              />
+            </>
+          )}
+
+          {/* Y轴标签 - 价格 */}
+          <text x={padL - 4} y={padT + 4} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMax / 1000).toFixed(0)}K</text>
+          <text x={padL - 4} y={padT + chartH} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMin / 1000).toFixed(0)}K</text>
+
+          {/* Y轴标签 - 净持仓 */}
+          <text x={W - padR + 4} y={padT + 4} textAnchor="start" fontSize={9} fill={COLORS.green}>+{(nMax / 1000).toFixed(0)}K</text>
+          <text x={W - padR + 4} y={padT + chartH} textAnchor="start" fontSize={9} fill={COLORS.red}>-{(nMax / 1000).toFixed(0)}K</text>
+
+          {/* X 轴日期标签 */}
+          {chartData.map((d, i) => {
+            if (i % Math.max(1, Math.floor(chartData.length / 6)) !== 0) return null;
+            return (
+              <text
+                key={i}
+                x={padL + i * gap + gap / 2}
+                y={H - 4}
+                textAnchor="middle"
+                fontSize={9}
+                fill={COLORS.muted}
+              >
+                {d.date.slice(5)}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    </Card>
+  );
+}
+
 // ========== BTC 底部分析标签页 ==========
 function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; analysis?: AIAnalysis | null; history?: MetricsHistoryResponse | null }) {
   const btc = data?.crypto?.BTC;
@@ -1493,6 +1690,9 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
           </tbody>
         </table>
       </Card>
+
+      {/* LTH 净持仓变化图表 */}
+      <LTHNetPositionChart />
 
       {/* 历史对比卡片 */}
       <HistoryComparisonCard
