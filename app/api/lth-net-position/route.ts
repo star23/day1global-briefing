@@ -1,5 +1,5 @@
-// ========== LTH 7日净持仓变化 API ==========
-// 返回最近 90 天的 LTH 净持仓变化（今日 supply - 7天前 supply）
+// ========== LTH 净持仓变化 API ==========
+// 返回最近 90 天的 LTH 每日净持仓变化 + 7日净持仓变化
 // 5 分钟内存缓存，避免频繁调用 CoinGlass
 
 import { NextResponse } from "next/server";
@@ -16,15 +16,25 @@ interface LTHDataPoint {
 
 interface LTHNetPositionPoint {
   date: string;
-  timestamp: number;
   price: number;
   supply: number;
+  netChange1d: number | null;
   netChange7d: number | null;
 }
 
 let cachedResult: LTHNetPositionPoint[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000;
+
+function tsToDate(ts: number): string {
+  // CoinGlass timestamp 可能是秒或毫秒
+  const ms = ts > 1e12 ? ts : ts * 1000;
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export async function GET() {
   const now = Date.now();
@@ -69,27 +79,23 @@ export async function GET() {
 
     const rawData: LTHDataPoint[] = json.data;
 
-    // 计算每个点的 7 日净持仓变化
     const result: LTHNetPositionPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
       const point = rawData[i];
-      const date = new Date(point.timestamp * 1000)
-        .toISOString()
-        .split("T")[0];
 
-      let netChange7d: number | null = null;
-      if (i >= 7) {
-        netChange7d = Math.round(
-          point.long_term_holder_supply -
-            rawData[i - 7].long_term_holder_supply,
-        );
-      }
+      const netChange1d = i >= 1
+        ? Math.round(point.long_term_holder_supply - rawData[i - 1].long_term_holder_supply)
+        : null;
+
+      const netChange7d = i >= 7
+        ? Math.round(point.long_term_holder_supply - rawData[i - 7].long_term_holder_supply)
+        : null;
 
       result.push({
-        date,
-        timestamp: point.timestamp,
+        date: tsToDate(point.timestamp),
         price: point.price,
         supply: point.long_term_holder_supply,
+        netChange1d,
         netChange7d,
       });
     }

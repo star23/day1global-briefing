@@ -1156,11 +1156,12 @@ function HistoryComparisonCard({
   );
 }
 
-// ========== LTH 7日净持仓变化图表 ==========
+// ========== LTH 净持仓变化图表 ==========
 interface LTHNetPositionPoint {
   date: string;
   price: number;
   supply: number;
+  netChange1d: number | null;
   netChange7d: number | null;
 }
 
@@ -1181,8 +1182,8 @@ function LTHNetPositionChart() {
     );
   }
 
-  // 只取有 netChange7d 的数据点
-  const chartData = data.filter((d) => d.netChange7d !== null);
+  // 只取有每日和7日变化数据的点
+  const chartData = data.filter((d) => d.netChange1d !== null && d.netChange7d !== null);
   if (chartData.length === 0) {
     return (
       <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
@@ -1192,25 +1193,37 @@ function LTHNetPositionChart() {
   }
 
   // 图表尺寸
-  const W = 820, H = 260;
-  const padL = 55, padR = 15, padT = 20, padB = 30;
+  const W = 820, H = 280;
+  const padL = 55, padR = 50, padT = 20, padB = 30;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
 
   // 数据范围
   const prices = chartData.map((d) => d.price);
-  const nets = chartData.map((d) => d.netChange7d!);
+  const dailyNets = chartData.map((d) => d.netChange1d!);
+  const weeklyNets = chartData.map((d) => d.netChange7d!);
   const pMin = Math.min(...prices), pMax = Math.max(...prices);
-  const nMax = Math.max(...nets.map(Math.abs), 1);
+  // 柱状图和折线共享同一个 Y 轴范围
+  const allNets = [...dailyNets, ...weeklyNets];
+  const nMax = Math.max(...allNets.map(Math.abs), 1);
 
-  const barW = Math.max(1, (chartW / chartData.length) * 0.7);
   const gap = chartW / chartData.length;
+  const barW = Math.max(1, gap * 0.65);
 
-  // 价格折线坐标
+  // 辅助：净持仓 Y 坐标（0 在中间）
+  const netY = (val: number) => padT + chartH / 2 - (val / nMax) * (chartH / 2);
+
+  // BTC 价格折线坐标
   const priceLine = chartData.map((d, i) => {
     const x = padL + i * gap + gap / 2;
     const y = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
     return `${x},${y}`;
+  }).join(" ");
+
+  // 7日净持仓折线坐标
+  const net7dLine = chartData.map((d, i) => {
+    const x = padL + i * gap + gap / 2;
+    return `${x},${netY(d.netChange7d!)}`;
   }).join(" ");
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -1223,31 +1236,43 @@ function LTHNetPositionChart() {
   };
 
   const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
+  const fmtDate = (d: string) => {
+    const [y, m, day] = d.split("-");
+    return `${y}.${parseInt(m)}.${parseInt(day)}`;
+  };
 
   return (
-    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>长期持有者净持仓变化<InfoTooltip text="LTH 7日净持仓 = 今日 LTH Supply - 7天前 LTH Supply\n正值(绿色) = 长期持有者在增持\n负值(红色) = 长期持有者在减持\n灰色折线 = BTC价格" /></span>} icon="📊" accent={COLORS.accent}>
+    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>长期持有者净持仓变化<InfoTooltip text="柱状图 = 每日净持仓变化（今日 Supply - 昨日 Supply）\n蓝色折线 = 7日净持仓变化（今日 Supply - 7天前 Supply）\n灰色折线 = BTC 价格\n\n正值(绿色) = 长期持有者在增持\n负值(红色) = 长期持有者在减持" /></span>} icon="📊" accent={COLORS.accent}>
       {/* Tooltip */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: 20, marginBottom: 4 }}>
+      <div style={{ minHeight: 36, marginBottom: 4 }}>
         {hovered ? (
-          <div style={{ fontSize: 11, color: COLORS.muted, display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span>{hovered.date}</span>
-            <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${hovered.price.toLocaleString()}</span></span>
-            <span>LTH 7日净持仓: <span style={{ color: hovered.netChange7d! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{hovered.netChange7d! >= 0 ? "+" : ""}{hovered.netChange7d!.toLocaleString()} BTC</span></span>
+          <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${hovered.price.toLocaleString()}</span></span>
+              <span>LTH Supply: <span style={{ color: COLORS.text, fontWeight: 700 }}>{(hovered.supply / 1e6).toFixed(4)}M</span></span>
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <span>每日净持仓: <span style={{ color: hovered.netChange1d! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{hovered.netChange1d! >= 0 ? "+" : ""}{hovered.netChange1d!.toLocaleString()} BTC</span></span>
+              <span>7日净持仓: <span style={{ color: hovered.netChange7d! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{hovered.netChange7d! >= 0 ? "+" : ""}{hovered.netChange7d!.toLocaleString()} BTC</span></span>
+            </div>
           </div>
         ) : (
-          <div style={{ fontSize: 11, color: COLORS.muted }}>最近 {chartData.length} 天 · 鼠标悬停查看详情</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 11, color: COLORS.muted }}>最近 {chartData.length} 天 · 鼠标悬停查看详情</div>
+            <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 8, height: 8, background: COLORS.green + "88", display: "inline-block", borderRadius: 1 }} /><span style={{ width: 8, height: 8, background: COLORS.red + "88", display: "inline-block", borderRadius: 1 }} /> 每日
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 12, height: 2, background: COLORS.accent, display: "inline-block", borderRadius: 1 }} /> 7日
+              </span>
+            </div>
+          </div>
         )}
-        <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 8, height: 8, background: COLORS.green + "88", display: "inline-block", borderRadius: 1 }} /> 增持
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 8, height: 8, background: COLORS.red + "88", display: "inline-block", borderRadius: 1 }} /> 减持
-          </span>
-        </div>
       </div>
 
       {/* SVG 图表 */}
@@ -1259,15 +1284,15 @@ function LTHNetPositionChart() {
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverIdx(null)}
         >
-          {/* 柱状图：LTH 7日净持仓 */}
+          {/* 柱状图：每日净持仓变化 */}
           {chartData.map((d, i) => {
-            const net = d.netChange7d!;
+            const net = d.netChange1d!;
             const barH = (Math.abs(net) / nMax) * (chartH / 2);
             const x = padL + i * gap + (gap - barW) / 2;
             const midY = padT + chartH / 2;
             const isPositive = net >= 0;
             const y = isPositive ? midY - barH : midY;
-            const opacity = hoverIdx !== null && hoverIdx !== i ? 0.35 : 0.7;
+            const opacity = hoverIdx !== null && hoverIdx !== i ? 0.3 : 0.65;
 
             return (
               <rect
@@ -1290,60 +1315,62 @@ function LTHNetPositionChart() {
             stroke={COLORS.muted} strokeWidth={0.5} strokeDasharray="4,3" opacity={0.4}
           />
 
+          {/* 7日净持仓折线 */}
+          <polyline
+            points={net7dLine}
+            fill="none"
+            stroke={COLORS.accent}
+            strokeWidth={1.8}
+            opacity={0.85}
+          />
+
           {/* BTC 价格折线 */}
           <polyline
             points={priceLine}
             fill="none"
             stroke={COLORS.muted}
             strokeWidth={1.5}
-            opacity={0.6}
+            opacity={0.5}
           />
 
-          {/* 悬停竖线 */}
-          {hoverIdx !== null && (
-            <>
-              <line
-                x1={padL + hoverIdx * gap + gap / 2}
-                y1={padT}
-                x2={padL + hoverIdx * gap + gap / 2}
-                y2={padT + chartH}
-                stroke={COLORS.accent}
-                strokeWidth={0.8}
-                strokeDasharray="3,3"
-                opacity={0.6}
-              />
-              <circle
-                cx={padL + hoverIdx * gap + gap / 2}
-                cy={padT + chartH - ((chartData[hoverIdx].price - pMin) / (pMax - pMin || 1)) * chartH}
-                r={3}
-                fill={COLORS.accent}
-                stroke={COLORS.card}
-                strokeWidth={1.5}
-              />
-            </>
-          )}
+          {/* 悬停竖线 + 圆点 */}
+          {hoverIdx !== null && (() => {
+            const cx = padL + hoverIdx * gap + gap / 2;
+            const d = chartData[hoverIdx];
+            const priceY = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
+            const net7Y = netY(d.netChange7d!);
+            return (
+              <>
+                <line x1={cx} y1={padT} x2={cx} y2={padT + chartH} stroke={COLORS.accent} strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5} />
+                <circle cx={cx} cy={priceY} r={3} fill={COLORS.muted} stroke={COLORS.card} strokeWidth={1.5} />
+                <circle cx={cx} cy={net7Y} r={3} fill={COLORS.accent} stroke={COLORS.card} strokeWidth={1.5} />
+              </>
+            );
+          })()}
 
-          {/* Y轴标签 - 价格 */}
+          {/* Y轴标签 - 左侧价格 */}
           <text x={padL - 4} y={padT + 4} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMax / 1000).toFixed(0)}K</text>
           <text x={padL - 4} y={padT + chartH} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMin / 1000).toFixed(0)}K</text>
 
-          {/* Y轴标签 - 净持仓 */}
+          {/* Y轴标签 - 右侧净持仓 */}
           <text x={W - padR + 4} y={padT + 4} textAnchor="start" fontSize={9} fill={COLORS.green}>+{(nMax / 1000).toFixed(0)}K</text>
+          <text x={W - padR + 4} y={padT + chartH / 2 + 3} textAnchor="start" fontSize={9} fill={COLORS.muted}>0</text>
           <text x={W - padR + 4} y={padT + chartH} textAnchor="start" fontSize={9} fill={COLORS.red}>-{(nMax / 1000).toFixed(0)}K</text>
 
           {/* X 轴日期标签 */}
           {chartData.map((d, i) => {
-            if (i % Math.max(1, Math.floor(chartData.length / 6)) !== 0) return null;
+            const step = Math.max(1, Math.floor(chartData.length / 8));
+            if (i % step !== 0 && i !== chartData.length - 1) return null;
             return (
               <text
                 key={i}
                 x={padL + i * gap + gap / 2}
-                y={H - 4}
+                y={H - 6}
                 textAnchor="middle"
                 fontSize={9}
                 fill={COLORS.muted}
               >
-                {d.date.slice(5)}
+                {d.date.slice(5).replace("-", "/")}
               </text>
             );
           })}
