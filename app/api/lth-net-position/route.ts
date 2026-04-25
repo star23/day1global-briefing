@@ -1,5 +1,5 @@
 // ========== LTH 净持仓变化 API ==========
-// 返回最近 90 天的 LTH 每日净持仓变化 + 7日净持仓变化
+// 返回最近 180 天的 LTH 每日净持仓变化 + 7日净持仓变化
 // 5 分钟内存缓存，避免频繁调用 CoinGlass
 
 import { NextResponse } from "next/server";
@@ -100,13 +100,13 @@ export async function GET() {
       });
     }
 
-    // 只返回最近 90 天
-    const last90 = result.slice(-90);
+    // 只返回最近 180 天
+    const last180 = result.slice(-180);
 
-    cachedResult = last90;
+    cachedResult = last180;
     cacheTimestamp = now;
 
-    return NextResponse.json(last90, {
+    return NextResponse.json(last180, {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (err) {
