@@ -1380,6 +1380,203 @@ function LTHNetPositionChart() {
   );
 }
 
+// ========== ETF 净流入图表 ==========
+interface ETFFlowPoint {
+  date: string;
+  price: number;
+  flowUsd: number;
+  flow7dSum: number | null;
+}
+
+function ETFFlowChart() {
+  const { data } = useSWR<ETFFlowPoint[]>(
+    "/api/etf-flow-history",
+    fetcher,
+    { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
+  );
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <Card title="BTC ETF 净流入" icon="🏦" accent={COLORS.green}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据加载中...</div>
+      </Card>
+    );
+  }
+
+  const chartData = data.filter((d) => d.flow7dSum !== null);
+  if (chartData.length === 0) {
+    return (
+      <Card title="BTC ETF 净流入" icon="🏦" accent={COLORS.green}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据不足</div>
+      </Card>
+    );
+  }
+
+  const W = 820, H = 280;
+  const padL = 55, padR = 50, padT = 20, padB = 30;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const prices = chartData.map((d) => d.price);
+  const flows = chartData.map((d) => d.flowUsd);
+  const flow7ds = chartData.map((d) => d.flow7dSum!);
+  const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  const allFlows = [...flows, ...flow7ds];
+  const fMax = Math.max(...allFlows.map(Math.abs), 1);
+
+  const gap = chartW / chartData.length;
+  const barW = Math.max(1, gap * 0.65);
+
+  const flowY = (val: number) => padT + chartH / 2 - (val / fMax) * (chartH / 2);
+
+  const priceLine = chartData.map((d, i) => {
+    const x = padL + i * gap + gap / 2;
+    const y = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
+    return `${x},${y}`;
+  }).join(" ");
+
+  const flow7dLine = chartData.map((d, i) => {
+    const x = padL + i * gap + gap / 2;
+    return `${x},${flowY(d.flow7dSum!)}`;
+  }).join(" ");
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    const idx = Math.floor((x - padL) / gap);
+    if (idx >= 0 && idx < chartData.length) setHoverIdx(idx);
+    else setHoverIdx(null);
+  };
+
+  const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
+  const fmtDate = (d: string) => {
+    const [y, m, day] = d.split("-");
+    return `${y}.${parseInt(m)}.${parseInt(day)}`;
+  };
+  const fmtFlow = (v: number) => {
+    const sign = v >= 0 ? "+" : "";
+    if (Math.abs(v) >= 1e9) return `${sign}${(v / 1e9).toFixed(2)}B`;
+    return `${sign}${(v / 1e6).toFixed(1)}M`;
+  };
+
+  return (
+    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>BTC ETF 净流入<InfoTooltip text="柱状图 = 每日 ETF 净流入（美元）\n蓝色折线 = 7 日累计净流入\n灰色折线 = BTC 价格\n\n连续净流入 = 机构看多信号\n连续净流出 = 机构卖出信号" /></span>} icon="🏦" accent={COLORS.green}>
+      <div style={{ minHeight: 36, marginBottom: 4 }}>
+        {hovered ? (
+          <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${hovered.price.toLocaleString()}</span></span>
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <span>当日净流入: <span style={{ color: hovered.flowUsd >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flowUsd)}</span></span>
+              <span>7日累计: <span style={{ color: hovered.flow7dSum! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flow7dSum!)}</span></span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 11, color: COLORS.muted }}>最近 {chartData.length} 天 · 鼠标悬停查看详情</div>
+            <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 8, height: 8, background: COLORS.green + "88", display: "inline-block", borderRadius: 1 }} /><span style={{ width: 8, height: 8, background: COLORS.red + "88", display: "inline-block", borderRadius: 1 }} /> 每日
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 12, height: 2, background: COLORS.accent, display: "inline-block", borderRadius: 1 }} /> 7日累计
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: "100%", overflowX: "auto" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width: "100%", height: "auto", display: "block", cursor: "crosshair" }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          {/* 柱状图：每日 ETF 净流入 */}
+          {chartData.map((d, i) => {
+            const barH = (Math.abs(d.flowUsd) / fMax) * (chartH / 2);
+            const x = padL + i * gap + (gap - barW) / 2;
+            const midY = padT + chartH / 2;
+            const isPositive = d.flowUsd >= 0;
+            const y = isPositive ? midY - barH : midY;
+            const opacity = hoverIdx !== null && hoverIdx !== i ? 0.3 : 0.65;
+
+            return (
+              <rect
+                key={i}
+                x={x} y={y}
+                width={barW}
+                height={Math.max(barH, 0.5)}
+                fill={isPositive ? COLORS.green : COLORS.red}
+                opacity={opacity}
+                rx={1}
+              />
+            );
+          })}
+
+          {/* 零线 */}
+          <line
+            x1={padL} y1={padT + chartH / 2}
+            x2={padL + chartW} y2={padT + chartH / 2}
+            stroke={COLORS.muted} strokeWidth={0.5} strokeDasharray="4,3" opacity={0.4}
+          />
+
+          {/* 7日累计净流入折线 */}
+          <polyline points={flow7dLine} fill="none" stroke={COLORS.accent} strokeWidth={1.8} opacity={0.85} />
+
+          {/* BTC 价格折线 */}
+          <polyline points={priceLine} fill="none" stroke={COLORS.muted} strokeWidth={1.5} opacity={0.5} />
+
+          {/* 悬停竖线 + 圆点 */}
+          {hoverIdx !== null && (() => {
+            const cx = padL + hoverIdx * gap + gap / 2;
+            const d = chartData[hoverIdx];
+            const priceY = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
+            const f7Y = flowY(d.flow7dSum!);
+            return (
+              <>
+                <line x1={cx} y1={padT} x2={cx} y2={padT + chartH} stroke={COLORS.accent} strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5} />
+                <circle cx={cx} cy={priceY} r={3} fill={COLORS.muted} stroke={COLORS.card} strokeWidth={1.5} />
+                <circle cx={cx} cy={f7Y} r={3} fill={COLORS.accent} stroke={COLORS.card} strokeWidth={1.5} />
+              </>
+            );
+          })()}
+
+          {/* Y轴 - 左侧价格 */}
+          <text x={padL - 4} y={padT + 4} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMax / 1000).toFixed(0)}K</text>
+          <text x={padL - 4} y={padT + chartH} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMin / 1000).toFixed(0)}K</text>
+
+          {/* Y轴 - 右侧流入 */}
+          <text x={W - padR + 4} y={padT + 4} textAnchor="start" fontSize={9} fill={COLORS.green}>+${(fMax / 1e6).toFixed(0)}M</text>
+          <text x={W - padR + 4} y={padT + chartH / 2 + 3} textAnchor="start" fontSize={9} fill={COLORS.muted}>0</text>
+          <text x={W - padR + 4} y={padT + chartH} textAnchor="start" fontSize={9} fill={COLORS.red}>-${(fMax / 1e6).toFixed(0)}M</text>
+
+          {/* X 轴日期 */}
+          {chartData.map((d, i) => {
+            const step = Math.max(1, Math.floor(chartData.length / 8));
+            if (i % step !== 0 && i !== chartData.length - 1) return null;
+            return (
+              <text key={i} x={padL + i * gap + gap / 2} y={H - 6} textAnchor="middle" fontSize={9} fill={COLORS.muted}>
+                {d.date.slice(5).replace("-", "/")}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    </Card>
+  );
+}
+
 // ========== BTC 底部分析标签页 ==========
 function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; analysis?: AIAnalysis | null; history?: MetricsHistoryResponse | null }) {
   const btc = data?.crypto?.BTC;
@@ -1720,6 +1917,9 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
       {/* LTH 净持仓变化图表 */}
       <LTHNetPositionChart />
+
+      {/* ETF 净流入图表 */}
+      <ETFFlowChart />
 
       {/* 历史对比卡片 */}
       <HistoryComparisonCard
