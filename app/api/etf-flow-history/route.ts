@@ -1,6 +1,6 @@
-// ========== LTH 净持仓变化 API ==========
-// 返回最近 180 天的 LTH 每日净持仓变化 + 7日净持仓变化
-// 5 分钟内存缓存，避免频繁调用 CoinGlass
+// ========== ETF 净流入历史 API ==========
+// 返回最近 90 天的 BTC ETF 每日净流入 + 7日累计净流入
+// 5 分钟内存缓存
 
 import { NextResponse } from "next/server";
 
@@ -8,26 +8,18 @@ export const dynamic = "force-dynamic";
 
 const COINGLASS_BASE = "https://open-api-v4.coinglass.com";
 
-interface LTHDataPoint {
-  timestamp: number;
-  price: number;
-  long_term_holder_supply: number;
-}
-
-interface LTHNetPositionPoint {
+interface ETFFlowPoint {
   date: string;
   price: number;
-  supply: number;
-  netChange1d: number | null;
-  netChange7d: number | null;
+  flowUsd: number;
+  flow7dSum: number | null;
 }
 
-let cachedResult: LTHNetPositionPoint[] | null = null;
+let cachedResult: ETFFlowPoint[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
 function tsToDate(ts: number): string {
-  // CoinGlass timestamp 可能是秒或毫秒
   const ms = ts > 1e12 ? ts : ts * 1000;
   const d = new Date(ms);
   const y = d.getUTCFullYear();
@@ -55,7 +47,7 @@ export async function GET() {
 
   try {
     const res = await fetch(
-      `${COINGLASS_BASE}/api/index/bitcoin-long-term-holder-supply`,
+      `${COINGLASS_BASE}/api/etf/bitcoin/flow-history`,
       {
         cache: "no-store",
         headers: { "CG-API-KEY": apiKey, accept: "application/json" },
@@ -77,40 +69,42 @@ export async function GET() {
       );
     }
 
-    const rawData: LTHDataPoint[] = json.data;
+    const rawData: { timestamp: number; price: number; flow_usd: number }[] = json.data;
 
-    const result: LTHNetPositionPoint[] = [];
+    const result: ETFFlowPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
       const point = rawData[i];
+      const flowUsd = Number(point.flow_usd) || 0;
 
-      const netChange1d = i >= 1
-        ? Math.round(point.long_term_holder_supply - rawData[i - 1].long_term_holder_supply)
-        : null;
-
-      const netChange7d = i >= 7
-        ? Math.round(point.long_term_holder_supply - rawData[i - 7].long_term_holder_supply)
-        : null;
+      // 7 日累计净流入
+      let flow7dSum: number | null = null;
+      if (i >= 6) {
+        let sum = 0;
+        for (let j = i - 6; j <= i; j++) {
+          sum += Number(rawData[j].flow_usd) || 0;
+        }
+        flow7dSum = Math.round(sum);
+      }
 
       result.push({
         date: tsToDate(point.timestamp),
         price: point.price,
-        supply: point.long_term_holder_supply,
-        netChange1d,
-        netChange7d,
+        flowUsd: Math.round(flowUsd),
+        flow7dSum,
       });
     }
 
-    // 只返回最近 180 天
-    const last180 = result.slice(-180);
+    // 最近 90 天
+    const last90 = result.slice(-90);
 
-    cachedResult = last180;
+    cachedResult = last90;
     cacheTimestamp = now;
 
-    return NextResponse.json(last180, {
+    return NextResponse.json(last90, {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (err) {
-    console.error("[LTH Net Position] 获取失败:", err);
+    console.error("[ETF Flow History] 获取失败:", err);
     if (cachedResult) {
       return NextResponse.json(cachedResult, {
         headers: { "Cache-Control": "s-maxage=60" },
