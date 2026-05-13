@@ -115,7 +115,7 @@ const STOCK_TOPICS = [
   { key: "GOOG", label: "Google (GOOG)", query: "Google Alphabet GOOG AI" },
   { key: "RKLB", label: "Rocket Lab (RKLB)", query: "Rocket Lab RKLB Neutron" },
   { key: "CRCL", label: "Circle (CRCL)", query: "Circle CRCL stablecoin USDC" },
-  { key: "HOOD", label: "Robinhood (HOOD)", query: "Robinhood HOOD crypto" },
+  { key: "HOOD", label: "Robinhood (HOOD)", query: "Robinhood HOOD crypto RVII venture fund" },
   { key: "COIN", label: "Coinbase (COIN)", query: "Coinbase COIN crypto" },
   { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM stock" },
   { key: "GLD", label: "SPDR Gold (GLD)", query: "GLD SPDR gold ETF" },
