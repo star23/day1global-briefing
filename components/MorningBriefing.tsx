@@ -1182,8 +1182,13 @@ function LTHNetPositionChart() {
     );
   }
 
-  // 只取有每日和7日变化数据的点
-  const chartData = data.filter((d) => d.netChange1d !== null && d.netChange7d !== null);
+  // 只取有效数据的点（排除 null、NaN、缺失 price）
+  const chartData = data.filter(
+    (d) =>
+      d.netChange1d != null && !isNaN(d.netChange1d) &&
+      d.netChange7d != null && !isNaN(d.netChange7d) &&
+      d.price != null && !isNaN(d.price) && d.price > 0
+  );
   if (chartData.length === 0) {
     return (
       <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
@@ -1249,12 +1254,12 @@ function LTHNetPositionChart() {
           <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
-              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${hovered.price.toLocaleString()}</span></span>
-              <span>LTH Supply: <span style={{ color: COLORS.text, fontWeight: 700 }}>{(hovered.supply / 1e6).toFixed(4)}M</span></span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${(hovered.price ?? 0).toLocaleString()}</span></span>
+              <span>LTH Supply: <span style={{ color: COLORS.text, fontWeight: 700 }}>{((hovered.supply ?? 0) / 1e6).toFixed(4)}M</span></span>
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <span>每日净持仓: <span style={{ color: hovered.netChange1d! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{hovered.netChange1d! >= 0 ? "+" : ""}{hovered.netChange1d!.toLocaleString()} BTC</span></span>
-              <span>7日净持仓: <span style={{ color: hovered.netChange7d! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{hovered.netChange7d! >= 0 ? "+" : ""}{hovered.netChange7d!.toLocaleString()} BTC</span></span>
+              <span>每日净持仓: <span style={{ color: (hovered.netChange1d ?? 0) >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{(hovered.netChange1d ?? 0) >= 0 ? "+" : ""}{(hovered.netChange1d ?? 0).toLocaleString()} BTC</span></span>
+              <span>7日净持仓: <span style={{ color: (hovered.netChange7d ?? 0) >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{(hovered.netChange7d ?? 0) >= 0 ? "+" : ""}{(hovered.netChange7d ?? 0).toLocaleString()} BTC</span></span>
             </div>
           </div>
         ) : (
@@ -1405,7 +1410,12 @@ function ETFFlowChart() {
     );
   }
 
-  const chartData = data.filter((d) => d.flow7dSum !== null);
+  const chartData = data.filter(
+    (d) =>
+      d.flow7dSum != null && !isNaN(d.flow7dSum) &&
+      !isNaN(d.flowUsd) &&
+      d.price != null && !isNaN(d.price) && d.price > 0
+  );
   if (chartData.length === 0) {
     return (
       <Card title="BTC ETF 净流入" icon="🏦" accent={COLORS.green}>
@@ -1469,11 +1479,11 @@ function ETFFlowChart() {
           <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
-              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${hovered.price.toLocaleString()}</span></span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${(hovered.price ?? 0).toLocaleString()}</span></span>
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <span>当日净流入: <span style={{ color: hovered.flowUsd >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flowUsd)}</span></span>
-              <span>7日累计: <span style={{ color: hovered.flow7dSum! >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flow7dSum!)}</span></span>
+              <span>当日净流入: <span style={{ color: (hovered.flowUsd ?? 0) >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flowUsd ?? 0)}</span></span>
+              <span>7日累计: <span style={{ color: (hovered.flow7dSum ?? 0) >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flow7dSum ?? 0)}</span></span>
             </div>
           </div>
         ) : (
