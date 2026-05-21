@@ -366,19 +366,19 @@ export default function MorningBriefing() {
   const { data, error, isLoading } = useSWR<MarketDataResponse>(
     "/api/market-data",
     fetcher,
-    { refreshInterval: 5 * 60 * 1000, revalidateOnFocus: true }
+    { refreshInterval: 10 * 60 * 1000, revalidateOnFocus: false }
   );
 
   const { data: analysis } = useSWR<AIAnalysis>(
     "/api/analysis",
     fetcher,
-    { refreshInterval: 5 * 60 * 1000, revalidateOnFocus: true }
+    { refreshInterval: 60 * 60 * 1000, revalidateOnFocus: false }
   );
 
   const { data: metricsHistory } = useSWR<MetricsHistoryResponse>(
     "/api/metrics-history",
     fetcher,
-    { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
+    { refreshInterval: 60 * 60 * 1000, revalidateOnFocus: false }
   );
 
   // 动态生成头部 Badge

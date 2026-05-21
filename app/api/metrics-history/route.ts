@@ -3,12 +3,23 @@
 // 返回昨天、一周前、一个月前的 BTC 指标数据
 
 import { NextResponse } from "next/server";
-import { getComparisonMetrics, migrateAddColumns } from "@/lib/db";
+import { getComparisonMetrics } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+let cachedResult: Record<string, unknown> | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 10 * 60 * 1000;
 
 export async function GET() {
+  const now = Date.now();
+  if (cachedResult && now - cacheTimestamp < CACHE_TTL) {
+    return NextResponse.json(cachedResult, {
+      headers: { "Cache-Control": "s-maxage=600, stale-while-revalidate=1200" },
+    });
+  }
+
   try {
-    // 确保新增列存在（nupl, lth_mvrv, ma365_price, ma365_ratio）
-    await migrateAddColumns();
     const rows = await getComparisonMetrics();
 
     // 转换为 { yesterday, oneWeek, oneMonth } 结构
@@ -60,13 +71,21 @@ export async function GET() {
       }
     }
 
+    cachedResult = result;
+    cacheTimestamp = now;
+
     return NextResponse.json(result, {
       headers: {
-        "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "s-maxage=600, stale-while-revalidate=1200",
       },
     });
   } catch (err) {
     console.error("[MetricsHistory] 查询失败:", err);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult, {
+        headers: { "Cache-Control": "s-maxage=60" },
+      });
+    }
     return NextResponse.json(
       { error: "查询失败", details: String(err) },
       { status: 500 }
