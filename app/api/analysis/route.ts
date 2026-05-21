@@ -20,19 +20,16 @@ export async function GET() {
     const analysis = await redis.get<AIAnalysis>("ai-analysis");
 
     if (!analysis) {
-      // 如果没有数据（比如还没跑过 cron），返回 null
       return NextResponse.json(null, {
         headers: {
-          // 没数据时缓存 1 分钟（很快会有数据）
-          "Cache-Control": "s-maxage=60, stale-while-revalidate=120",
+          "Cache-Control": "s-maxage=120, stale-while-revalidate=300",
         },
       });
     }
 
     return NextResponse.json(analysis, {
       headers: {
-        // AI 分析每天更新一次，CDN 缓存 1 分钟
-        "Cache-Control": "s-maxage=60, stale-while-revalidate=120",
+        "Cache-Control": "s-maxage=1800, stale-while-revalidate=3600",
       },
     });
   } catch (err) {

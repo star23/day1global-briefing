@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // ---- 内存缓存 ----
 let cachedRating: ReturnType<typeof calculateMarketRating> | null = null;
 let cacheTimestamp = 0;
-const CACHE_TTL = 120 * 1000; // 2 分钟内存缓存
+const CACHE_TTL = 5 * 60 * 1000; // 5 分钟内存缓存
 
 export async function GET() {
   const now = Date.now();
@@ -24,7 +24,7 @@ export async function GET() {
   if (cachedRating && now - cacheTimestamp < CACHE_TTL) {
     return NextResponse.json(cachedRating, {
       headers: {
-        "Cache-Control": "s-maxage=120, stale-while-revalidate=300",
+        "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
       },
     });
   }
@@ -71,7 +71,7 @@ export async function GET() {
 
     return NextResponse.json(rating, {
       headers: {
-        "Cache-Control": "s-maxage=120, stale-while-revalidate=300",
+        "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
       },
     });
   } catch (err) {
