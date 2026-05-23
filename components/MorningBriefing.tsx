@@ -1182,13 +1182,13 @@ function LTHNetPositionChart() {
     );
   }
 
-  // 只取有效数据的点（排除 null、NaN、缺失 price）
-  const chartData = data.filter(
-    (d) =>
-      d.netChange1d != null && !isNaN(d.netChange1d) &&
-      d.netChange7d != null && !isNaN(d.netChange7d) &&
-      d.price != null && !isNaN(d.price) && d.price > 0
-  );
+  const chartData = data
+    .map((d) => ({ ...d, price: d.price || 0 }))
+    .filter(
+      (d) =>
+        d.netChange1d != null && !isNaN(d.netChange1d) &&
+        d.netChange7d != null && !isNaN(d.netChange7d)
+    );
   if (chartData.length === 0) {
     return (
       <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
@@ -1410,12 +1410,9 @@ function ETFFlowChart() {
     );
   }
 
-  const chartData = data.filter(
-    (d) =>
-      d.flow7dSum != null && !isNaN(d.flow7dSum) &&
-      !isNaN(d.flowUsd) &&
-      d.price != null && !isNaN(d.price) && d.price > 0
-  );
+  const chartData = data
+    .map((d) => ({ ...d, price: d.price || 0, flowUsd: d.flowUsd || 0, flow7dSum: d.flow7dSum ?? null }))
+    .filter((d) => d.flow7dSum != null && !isNaN(d.flow7dSum));
   if (chartData.length === 0) {
     return (
       <Card title="BTC ETF 净流入" icon="🏦" accent={COLORS.green}>
