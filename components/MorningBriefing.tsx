@@ -1401,7 +1401,7 @@ interface ETFFlowPoint {
   flow7dSum: number | null;
 }
 
-function ETFFlowChart({ currentBtcPrice }: { currentBtcPrice?: number | null }) {
+function ETFFlowChart() {
   const { data } = useSWR<ETFFlowPoint[] | { error?: string }>(
     "/api/etf-flow-history",
     fetcher,
@@ -1450,8 +1450,7 @@ function ETFFlowChart({ currentBtcPrice }: { currentBtcPrice?: number | null }) 
   const validPrices = chartData
     .map((d) => d.price)
     .filter((price): price is number => typeof price === "number" && Number.isFinite(price) && price > 0);
-  const fallbackPrice = typeof currentBtcPrice === "number" && currentBtcPrice > 0 ? currentBtcPrice : null;
-  const prices = validPrices.length > 0 ? validPrices : fallbackPrice ? [fallbackPrice] : [];
+  const prices = validPrices;
   const flows = chartData.map((d) => d.flowUsd);
   const flow7ds = chartData.map((d) => d.flow7dSum!);
   const pMin = prices.length > 0 ? Math.min(...prices) : 0, pMax = prices.length > 0 ? Math.max(...prices) : 0;
@@ -1505,7 +1504,7 @@ function ETFFlowChart({ currentBtcPrice }: { currentBtcPrice?: number | null }) 
           <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
-              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>{hovered.price ? `$${hovered.price.toLocaleString()}` : fallbackPrice ? `$${fallbackPrice.toLocaleString()} 当前` : "N/A"}</span></span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>{hovered.price ? `$${hovered.price.toLocaleString()}` : "N/A"}</span></span>
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               <span>当日净流入: <span style={{ color: (hovered.flowUsd ?? 0) >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flowUsd ?? 0)}</span></span>
@@ -1961,7 +1960,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
       <LTHNetPositionChart />
 
       {/* ETF 净流入图表 */}
-      <ETFFlowChart currentBtcPrice={btc?.price ?? null} />
+      <ETFFlowChart />
 
       {/* 历史对比卡片 */}
       <HistoryComparisonCard
