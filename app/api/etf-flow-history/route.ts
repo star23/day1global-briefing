@@ -52,6 +52,37 @@ function readTimestamp(point: Record<string, unknown>): number | null {
   );
 }
 
+async function fetchBtcPriceByDate(apiKey: string): Promise<Map<string, number>> {
+  try {
+    const res = await fetch(
+      `${COINGLASS_BASE}/api/index/bitcoin-long-term-holder-supply`,
+      {
+        cache: "no-store",
+        headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+      },
+    );
+
+    if (!res.ok) return new Map();
+
+    const json = await res.json();
+    if (json.code !== "0" || !Array.isArray(json.data)) return new Map();
+
+    const priceByDate = new Map<string, number>();
+    for (const point of json.data as Record<string, unknown>[]) {
+      const timestamp = readTimestamp(point);
+      const price = readPrice(point);
+      if (timestamp && price) {
+        priceByDate.set(tsToDate(timestamp), price);
+      }
+    }
+
+    return priceByDate;
+  } catch (err) {
+    console.warn("[ETF Flow History] BTC price history fallback failed:", err);
+    return new Map();
+  }
+}
+
 export async function GET() {
   const now = Date.now();
 
@@ -70,13 +101,16 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch(
-      `${COINGLASS_BASE}/api/etf/bitcoin/flow-history`,
-      {
-        cache: "no-store",
-        headers: { "CG-API-KEY": apiKey, accept: "application/json" },
-      },
-    );
+    const [res, btcPriceByDate] = await Promise.all([
+      fetch(
+        `${COINGLASS_BASE}/api/etf/bitcoin/flow-history`,
+        {
+          cache: "no-store",
+          headers: { "CG-API-KEY": apiKey, accept: "application/json" },
+        },
+      ),
+      fetchBtcPriceByDate(apiKey),
+    ]);
 
     if (!res.ok) {
       return NextResponse.json(
@@ -98,6 +132,7 @@ export async function GET() {
     const result: ETFFlowPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
       const point = rawData[i];
+      const date = tsToDate(readTimestamp(point) ?? Date.now());
       const flowUsd = Number(point.flow_usd) || 0;
 
       // 7 日累计净流入
@@ -111,8 +146,8 @@ export async function GET() {
       }
 
       result.push({
-        date: tsToDate(readTimestamp(point) ?? Date.now()),
-        price: readPrice(point),
+        date,
+        price: readPrice(point) ?? btcPriceByDate.get(date) ?? null,
         flowUsd: Math.round(flowUsd),
         flow7dSum,
       });
