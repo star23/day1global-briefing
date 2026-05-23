@@ -1166,7 +1166,7 @@ interface LTHNetPositionPoint {
 }
 
 function LTHNetPositionChart() {
-  const { data } = useSWR<LTHNetPositionPoint[]>(
+  const { data } = useSWR<LTHNetPositionPoint[] | { error?: string }>(
     "/api/lth-net-position",
     fetcher,
     { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
@@ -1174,10 +1174,18 @@ function LTHNetPositionChart() {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  if (!data || data.length === 0) {
+  if (!data) {
     return (
       <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
         <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据加载中...</div>
+      </Card>
+    );
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <Card title="长期持有者净持仓变化" icon="📊" accent={COLORS.accent}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>LTH 历史数据暂不可用</div>
       </Card>
     );
   }
@@ -1388,13 +1396,13 @@ function LTHNetPositionChart() {
 // ========== ETF 净流入图表 ==========
 interface ETFFlowPoint {
   date: string;
-  price: number;
+  price: number | null;
   flowUsd: number;
   flow7dSum: number | null;
 }
 
-function ETFFlowChart() {
-  const { data } = useSWR<ETFFlowPoint[]>(
+function ETFFlowChart({ currentBtcPrice }: { currentBtcPrice?: number | null }) {
+  const { data } = useSWR<ETFFlowPoint[] | { error?: string }>(
     "/api/etf-flow-history",
     fetcher,
     { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
@@ -1402,7 +1410,7 @@ function ETFFlowChart() {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  if (!data || data.length === 0) {
+  if (!data) {
     return (
       <Card title="BTC ETF 净流入" icon="🏦" accent={COLORS.green}>
         <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据加载中...</div>
@@ -1410,8 +1418,21 @@ function ETFFlowChart() {
     );
   }
 
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <Card title="BTC ETF 净流入" icon="🏦" accent={COLORS.green}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>ETF 历史数据暂不可用</div>
+      </Card>
+    );
+  }
+
   const chartData = data
-    .map((d) => ({ ...d, price: d.price || 0, flowUsd: d.flowUsd || 0, flow7dSum: d.flow7dSum ?? null }))
+    .map((d) => ({
+      ...d,
+      price: typeof d.price === "number" && d.price > 0 ? d.price : null,
+      flowUsd: d.flowUsd || 0,
+      flow7dSum: d.flow7dSum ?? null,
+    }))
     .filter((d) => d.flow7dSum != null && !isNaN(d.flow7dSum));
   if (chartData.length === 0) {
     return (
@@ -1426,10 +1447,14 @@ function ETFFlowChart() {
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
 
-  const prices = chartData.map((d) => d.price);
+  const validPrices = chartData
+    .map((d) => d.price)
+    .filter((price): price is number => typeof price === "number" && Number.isFinite(price) && price > 0);
+  const fallbackPrice = typeof currentBtcPrice === "number" && currentBtcPrice > 0 ? currentBtcPrice : null;
+  const prices = validPrices.length > 0 ? validPrices : fallbackPrice ? [fallbackPrice] : [];
   const flows = chartData.map((d) => d.flowUsd);
   const flow7ds = chartData.map((d) => d.flow7dSum!);
-  const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  const pMin = prices.length > 0 ? Math.min(...prices) : 0, pMax = prices.length > 0 ? Math.max(...prices) : 0;
   const allFlows = [...flows, ...flow7ds];
   const fMax = Math.max(...allFlows.map(Math.abs), 1);
 
@@ -1438,11 +1463,15 @@ function ETFFlowChart() {
 
   const flowY = (val: number) => padT + chartH / 2 - (val / fMax) * (chartH / 2);
 
-  const priceLine = chartData.map((d, i) => {
-    const x = padL + i * gap + gap / 2;
-    const y = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
-    return `${x},${y}`;
-  }).join(" ");
+  const pricePoints = chartData
+    .map((d, i) => {
+      if (d.price == null || prices.length === 0) return null;
+      const x = padL + i * gap + gap / 2;
+      const y = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
+      return `${x},${y}`;
+    })
+    .filter((point): point is string => point != null);
+  const priceLine = pricePoints.join(" ");
 
   const flow7dLine = chartData.map((d, i) => {
     const x = padL + i * gap + gap / 2;
@@ -1476,7 +1505,7 @@ function ETFFlowChart() {
           <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
-              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>${(hovered.price ?? 0).toLocaleString()}</span></span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>{hovered.price ? `$${hovered.price.toLocaleString()}` : fallbackPrice ? `$${fallbackPrice.toLocaleString()} 当前` : "N/A"}</span></span>
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               <span>当日净流入: <span style={{ color: (hovered.flowUsd ?? 0) >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>${fmtFlow(hovered.flowUsd ?? 0)}</span></span>
@@ -1542,26 +1571,32 @@ function ETFFlowChart() {
           <polyline points={flow7dLine} fill="none" stroke={COLORS.accent} strokeWidth={1.8} opacity={0.85} />
 
           {/* BTC 价格折线 */}
-          <polyline points={priceLine} fill="none" stroke={COLORS.muted} strokeWidth={1.5} opacity={0.5} />
+          {pricePoints.length > 1 && (
+            <polyline points={priceLine} fill="none" stroke={COLORS.muted} strokeWidth={1.5} opacity={0.5} />
+          )}
 
           {/* 悬停竖线 + 圆点 */}
           {hoverIdx !== null && (() => {
             const cx = padL + hoverIdx * gap + gap / 2;
             const d = chartData[hoverIdx];
-            const priceY = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
+            const priceY = d.price != null && prices.length > 0 ? padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH : null;
             const f7Y = flowY(d.flow7dSum!);
             return (
               <>
                 <line x1={cx} y1={padT} x2={cx} y2={padT + chartH} stroke={COLORS.accent} strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5} />
-                <circle cx={cx} cy={priceY} r={3} fill={COLORS.muted} stroke={COLORS.card} strokeWidth={1.5} />
+                {priceY != null && <circle cx={cx} cy={priceY} r={3} fill={COLORS.muted} stroke={COLORS.card} strokeWidth={1.5} />}
                 <circle cx={cx} cy={f7Y} r={3} fill={COLORS.accent} stroke={COLORS.card} strokeWidth={1.5} />
               </>
             );
           })()}
 
           {/* Y轴 - 左侧价格 */}
-          <text x={padL - 4} y={padT + 4} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMax / 1000).toFixed(0)}K</text>
-          <text x={padL - 4} y={padT + chartH} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMin / 1000).toFixed(0)}K</text>
+          {prices.length > 0 && (
+            <>
+              <text x={padL - 4} y={padT + 4} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMax / 1000).toFixed(0)}K</text>
+              <text x={padL - 4} y={padT + chartH} textAnchor="end" fontSize={9} fill={COLORS.muted}>${(pMin / 1000).toFixed(0)}K</text>
+            </>
+          )}
 
           {/* Y轴 - 右侧流入 */}
           <text x={W - padR + 4} y={padT + 4} textAnchor="start" fontSize={9} fill={COLORS.green}>+${(fMax / 1e6).toFixed(0)}M</text>
@@ -1926,7 +1961,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
       <LTHNetPositionChart />
 
       {/* ETF 净流入图表 */}
-      <ETFFlowChart />
+      <ETFFlowChart currentBtcPrice={btc?.price ?? null} />
 
       {/* 历史对比卡片 */}
       <HistoryComparisonCard

@@ -10,7 +10,7 @@ const COINGLASS_BASE = "https://open-api-v4.coinglass.com";
 
 interface ETFFlowPoint {
   date: string;
-  price: number;
+  price: number | null;
   flowUsd: number;
   flow7dSum: number | null;
 }
@@ -26,6 +26,30 @@ function tsToDate(ts: number): string {
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
   const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function readNumber(value: unknown): number | null {
+  const num = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+function readPrice(point: Record<string, unknown>): number | null {
+  return (
+    readNumber(point.price) ??
+    readNumber(point.btc_price) ??
+    readNumber(point.btcPrice) ??
+    readNumber(point.close) ??
+    readNumber(point.c)
+  );
+}
+
+function readTimestamp(point: Record<string, unknown>): number | null {
+  return (
+    readNumber(point.timestamp) ??
+    readNumber(point.time) ??
+    readNumber(point.t) ??
+    readNumber(point.date)
+  );
 }
 
 export async function GET() {
@@ -69,7 +93,7 @@ export async function GET() {
       );
     }
 
-    const rawData: { timestamp: number; price: number; flow_usd: number }[] = json.data;
+    const rawData: Record<string, unknown>[] = json.data;
 
     const result: ETFFlowPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
@@ -87,8 +111,8 @@ export async function GET() {
       }
 
       result.push({
-        date: tsToDate(point.timestamp),
-        price: point.price,
+        date: tsToDate(readTimestamp(point) ?? Date.now()),
+        price: readPrice(point),
         flowUsd: Math.round(flowUsd),
         flow7dSum,
       });
