@@ -140,7 +140,7 @@ export interface AIAnalysis {
   iranCeasefire: string;      // 美国-伊朗停火进展分析
   hormuzStrait: string;       // 霍尔木兹海峡封锁风险分析
   cryptoTopicsAnalysis: string;  // 加密标的动态分析（BTC/ETH/XAUT/HYPE/VIRTUAL/TAO/BNB/SOL）
-  stockTopicsAnalysis: string;   // 美股标的动态分析（NVDA/TSLA/GOOG/RKLB/CRCL/HOOD/COIN/TEM/Stripe）
+  stockTopicsAnalysis: string;   // 美股标的动态分析（NVDA/TSLA/GOOG/RKLB/CRCL/HOOD/COIN/TEM/GLD/MRVL/NBIS/INTC/AMD/TSM/QCOM）
   generatedAt: string;        // 生成时间（ISO 格式）
   dataTimestamp: string;      // 基于的市场数据时间戳
 }
