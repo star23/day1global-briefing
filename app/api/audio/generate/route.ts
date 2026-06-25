@@ -5,10 +5,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { put } from "@vercel/blob";
 import { generateTTSAudio } from "@/lib/tts";
 import { AIAnalysis, MarketDataResponse } from "@/lib/types";
 import { getTodayBeijing } from "@/lib/date-utils";
+import { cleanupOldBriefingAudio, uploadBriefingAudio } from "@/lib/audio-blob";
 
 export const maxDuration = 300; // TTS 生成可能较慢，允许 5 分钟
 
@@ -54,22 +54,38 @@ export async function GET(request: NextRequest) {
 
     // 上传到 Vercel Blob
     const today = getTodayBeijing();
-    const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
-      access: "public",
-      contentType: "audio/mpeg",
-      addRandomSuffix: false,
-    });
+    const blob = await uploadBriefingAudio(today, audioBuffer);
 
     // 在 Redis 只存 URL（很小），24h 过期
     await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
 
     console.log(`[Audio Generate] 音频已生成并上传 (${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB) → ${blob.url}`);
 
+    let cleanup = null;
+    try {
+      cleanup = await cleanupOldBriefingAudio();
+      console.log(
+        `[Audio Generate] 旧音频清理完成: 删除 ${cleanup.deleted} 个，保留最近 ${cleanup.retentionDays} 天`
+      );
+    } catch (cleanupErr) {
+      console.error("[Audio Generate] 旧音频清理失败:", cleanupErr);
+    }
+
     return NextResponse.json({
       success: true,
       size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`,
       url: blob.url,
       analysisFrom: analysis.generatedAt,
+      cleanup: cleanup
+        ? {
+            retentionDays: cleanup.retentionDays,
+            cutoffDate: cleanup.cutoffDate,
+            scanned: cleanup.scanned,
+            kept: cleanup.kept,
+            deleted: cleanup.deleted,
+            skipped: cleanup.skipped,
+          }
+        : null,
       message: "音频已生成，可通过 /api/audio 收听，未推送 Telegram",
     });
   } catch (err) {
