@@ -16,8 +16,8 @@ import { pushTelegramBriefing, pushTelegramAudio } from "../lib/telegram";
 import { generateTTSAudio } from "../lib/tts";
 import { ensureTable, migrateAddColumns, upsertDailyMetrics } from "../lib/db";
 import { Redis } from "@upstash/redis";
-import { put } from "@vercel/blob";
 import { getTodayBeijing } from "../lib/date-utils";
+import { cleanupOldBriefingAudio, uploadBriefingAudio } from "../lib/audio-blob";
 
 const BASE_URL = process.env.BRIEFING_BASE_URL || "https://brief.day1global.xyz";
 const skipTelegram = process.argv.includes("--skip-telegram");
@@ -119,14 +119,18 @@ async function main() {
 
       if (process.env.BLOB_READ_WRITE_TOKEN) {
         const today = getTodayBeijing();
-        const blob = await put(`briefing-audio/${today}.mp3`, audioBuffer, {
-          access: "public",
-          contentType: "audio/mpeg",
-          addRandomSuffix: false,
-          allowOverwrite: true,
-        });
+        const blob = await uploadBriefingAudio(today, audioBuffer);
         await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
         console.log(`  ✓ Blob URL: ${blob.url}`);
+
+        try {
+          const cleanup = await cleanupOldBriefingAudio();
+          console.log(
+            `  ✓ 旧音频清理完成: 删除 ${cleanup.deleted} 个，保留最近 ${cleanup.retentionDays} 天`
+          );
+        } catch (cleanupErr) {
+          console.error("  ✗ 旧音频清理失败:", cleanupErr);
+        }
       }
     } catch (ttsErr) {
       console.error("  ✗ 音频生成失败:", ttsErr);
