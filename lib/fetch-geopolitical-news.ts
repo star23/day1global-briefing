@@ -119,7 +119,12 @@ const STOCK_TOPICS = [
   { key: "COIN", label: "Coinbase (COIN)", query: "Coinbase COIN crypto" },
   { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM stock" },
   { key: "GLD", label: "SPDR Gold (GLD)", query: "GLD SPDR gold ETF" },
-  { key: "Stripe", label: "Stripe", query: "Stripe payments fintech IPO" },
+  { key: "MRVL", label: "Marvell Technology (MRVL)", query: "Marvell Technology MRVL AI chips" },
+  { key: "NBIS", label: "Nebius Group (NBIS)", query: "Nebius Group NBIS AI cloud" },
+  { key: "INTC", label: "Intel (INTC)", query: "Intel INTC foundry AI chip" },
+  { key: "AMD", label: "AMD", query: "AMD AI GPU MI300 MI350" },
+  { key: "TSM", label: "TSMC (TSM)", query: "TSMC TSM AI semiconductor" },
+  { key: "QCOM", label: "Qualcomm (QCOM)", query: "Qualcomm QCOM edge AI chips" },
 ] as const;
 
 // ========== 数据结构 ==========

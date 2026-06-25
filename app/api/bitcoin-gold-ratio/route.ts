@@ -55,6 +55,10 @@ function readRange(value: string | null): RangeKey {
   return DEFAULT_RANGE;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchBitcoinMarketChart(days: number): Promise<{
   btcPriceByDate: Map<string, number>;
   btcMarketCapByDate: Map<string, number>;
@@ -95,30 +99,81 @@ async function fetchBitcoinMarketChart(days: number): Promise<{
   return { btcPriceByDate, btcMarketCapByDate };
 }
 
-async function fetchGoldPriceByDate(days: number): Promise<Map<string, number>> {
-  const goldPriceByDate = new Map<string, number>();
+function estimateBitcoinSupply(date: string): number {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const dateMs = new Date(`${date}T00:00:00Z`).getTime();
+  const halving2016 = Date.UTC(2016, 6, 9);
+  const halving2020 = Date.UTC(2020, 4, 11);
+  const halving2024 = Date.UTC(2024, 3, 20);
+
+  if (dateMs < halving2020) {
+    const daysSince2016 = Math.max(0, Math.floor((dateMs - halving2016) / dayMs));
+    return Math.min(21_000_000, 15_750_000 + daysSince2016 * 1_800);
+  }
+
+  if (dateMs < halving2024) {
+    const daysSince2020 = Math.max(0, Math.floor((dateMs - halving2020) / dayMs));
+    return Math.min(21_000_000, 18_375_000 + daysSince2020 * 900);
+  }
+
+  const daysSince2024 = Math.max(0, Math.floor((dateMs - halving2024) / dayMs));
+  return Math.min(21_000_000, 19_687_500 + daysSince2024 * 450);
+}
+
+async function fetchBitcoinMarketData(days: number): Promise<{
+  btcPriceByDate: Map<string, number>;
+  btcMarketCapByDate: Map<string, number>;
+}> {
+  if (days <= 365 || process.env.COINGECKO_API_KEY) {
+    try {
+      return await fetchBitcoinMarketChart(days);
+    } catch (err) {
+      console.warn("[BitcoinGoldRatio] CoinGecko market cap fallback to OKX candles:", err);
+    }
+  }
+
+  const btcPriceByDate = await fetchDailyCloseByDate("BTC-USDT", days);
+  const btcMarketCapByDate = new Map<string, number>();
+  for (const [date, price] of Array.from(btcPriceByDate.entries())) {
+    btcMarketCapByDate.set(date, price * estimateBitcoinSupply(date));
+  }
+
+  return { btcPriceByDate, btcMarketCapByDate };
+}
+
+async function fetchOkxJson(url: string): Promise<any> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+
+    if (res.status !== 429 || attempt === 3) {
+      if (!res.ok) {
+        throw new Error(`OKX request failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    await sleep(700 * (attempt + 1));
+  }
+}
+
+async function fetchDailyCloseByDate(instId: string, days: number): Promise<Map<string, number>> {
+  const closeByDate = new Map<string, number>();
   let after: string | null = null;
   let previousOldest: string | null = null;
   const targetRows = days + 10;
   const maxLoops = Math.ceil(targetRows / 100) + 3;
 
-  for (let loop = 0; loop < maxLoops && goldPriceByDate.size < targetRows; loop++) {
+  for (let loop = 0; loop < maxLoops && closeByDate.size < targetRows; loop++) {
     const url = new URL(`${OKX_BASE}/api/v5/market/history-candles`);
-    url.searchParams.set("instId", "XAUT-USDT");
+    url.searchParams.set("instId", instId);
     url.searchParams.set("bar", "1D");
     url.searchParams.set("limit", "100");
     if (after) url.searchParams.set("after", after);
 
-    const res = await fetch(url.toString(), {
-      cache: "no-store",
-      headers: { accept: "application/json" },
-    });
-
-    if (!res.ok) {
-      throw new Error(`OKX request failed: ${res.status}`);
-    }
-
-    const json = await res.json();
+    const json = await fetchOkxJson(url.toString());
     if (json.code !== "0" || !Array.isArray(json.data)) {
       throw new Error("Invalid OKX response");
     }
@@ -127,16 +182,17 @@ async function fetchGoldPriceByDate(days: number): Promise<Map<string, number>> 
     for (const row of json.data as unknown[][]) {
       const ts = readNumber(row[0]);
       const close = readNumber(row[4]);
-      if (ts && close) goldPriceByDate.set(toUtcDate(ts), close);
+      if (ts && close) closeByDate.set(toUtcDate(ts), close);
     }
 
     const oldest = String(json.data[json.data.length - 1]?.[0] ?? "");
     if (!oldest || oldest === previousOldest) break;
     previousOldest = oldest;
     after = oldest;
+    await sleep(150);
   }
 
-  return goldPriceByDate;
+  return closeByDate;
 }
 
 export async function GET(request: NextRequest) {
@@ -152,10 +208,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [{ btcPriceByDate, btcMarketCapByDate }, goldPriceByDate] = await Promise.all([
-      fetchBitcoinMarketChart(days),
-      fetchGoldPriceByDate(days),
-    ]);
+    const { btcPriceByDate, btcMarketCapByDate } = await fetchBitcoinMarketData(days);
+    const goldPriceByDate = await fetchDailyCloseByDate("XAUT-USDT", days);
 
     const data: BitcoinGoldRatioPoint[] = Array.from(btcMarketCapByDate.keys())
       .sort()
