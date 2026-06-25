@@ -1618,6 +1618,221 @@ function ETFFlowChart() {
   );
 }
 
+// ========== Bitcoin / Gold Ratio 图表 ==========
+type BitcoinGoldRange = "1m" | "3m" | "1y" | "2y" | "4y";
+
+interface BitcoinGoldRatioPoint {
+  date: string;
+  ratioPct: number;
+  btcMarketCap: number;
+  goldMarketCap: number;
+  btcPrice: number;
+  goldPrice: number;
+}
+
+const BITCOIN_GOLD_RANGES: { key: BitcoinGoldRange; label: string }[] = [
+  { key: "1m", label: "1M" },
+  { key: "3m", label: "3M" },
+  { key: "1y", label: "1Y" },
+  { key: "2y", label: "2Y" },
+  { key: "4y", label: "4Y" },
+];
+
+function BitcoinGoldRatioChart() {
+  const [range, setRange] = useState<BitcoinGoldRange>("1y");
+  const { data } = useSWR<BitcoinGoldRatioPoint[] | { error?: string }>(
+    `/api/bitcoin-gold-ratio?range=${range}`,
+    fetcher,
+    { refreshInterval: 60 * 60 * 1000, revalidateOnFocus: false }
+  );
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  if (!data) {
+    return (
+      <Card title="Bitcoin / Gold Ratio" icon="⚖️" accent={COLORS.gold}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据加载中...</div>
+      </Card>
+    );
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <Card title="Bitcoin / Gold Ratio" icon="⚖️" accent={COLORS.gold}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>Bitcoin / Gold Ratio 暂不可用</div>
+      </Card>
+    );
+  }
+
+  const chartData = data.filter((d) =>
+    Number.isFinite(d.ratioPct) &&
+    d.ratioPct > 0 &&
+    Number.isFinite(d.btcMarketCap) &&
+    Number.isFinite(d.goldMarketCap) &&
+    Number.isFinite(d.btcPrice) &&
+    Number.isFinite(d.goldPrice)
+  );
+
+  if (chartData.length === 0) {
+    return (
+      <Card title="Bitcoin / Gold Ratio" icon="⚖️" accent={COLORS.gold}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据不足</div>
+      </Card>
+    );
+  }
+
+  const W = 820, H = 280;
+  const padL = 55, padR = 24, padT = 20, padB = 36;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const ratios = chartData.map((d) => d.ratioPct);
+  const rawMin = Math.min(...ratios);
+  const rawMax = Math.max(...ratios);
+  const span = Math.max(rawMax - rawMin, 0.1);
+  const yMin = Math.max(0, rawMin - span * 0.15);
+  const yMax = rawMax + span * 0.15;
+  const denom = yMax - yMin || 1;
+  const gap = chartData.length > 1 ? chartW / (chartData.length - 1) : chartW;
+  const ratioY = (val: number) => padT + chartH - ((val - yMin) / denom) * chartH;
+
+  const linePoints = chartData.map((d, i) => {
+    const x = padL + i * gap;
+    return `${x},${ratioY(d.ratioPct)}`;
+  }).join(" ");
+  const areaPoints = `${padL},${padT + chartH} ${linePoints} ${padL + chartW},${padT + chartH}`;
+  const latest = chartData[chartData.length - 1];
+  const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    const idx = chartData.length > 1 ? Math.round((x - padL) / gap) : 0;
+    if (idx >= 0 && idx < chartData.length) setHoverIdx(idx);
+    else setHoverIdx(null);
+  };
+
+  const fmtDate = (d: string) => {
+    const [y, m, day] = d.split("-");
+    return `${y}.${parseInt(m)}.${parseInt(day)}`;
+  };
+  const fmtRatio = (v: number) => `${v.toFixed(2)}%`;
+  const fmtUsdCompact = (v: number) => {
+    if (v >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
+    if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+    if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+    return `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  };
+  const fmtPriceUsd = (v: number) => `$${v.toLocaleString("en-US", { maximumFractionDigits: v >= 1000 ? 0 : 2 })}`;
+
+  return (
+    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Bitcoin / Gold Ratio<InfoTooltip text="BTC 市值 / 黄金总市值。\n\n上升 = BTC 相对黄金跑赢\n下降 = 黄金相对 BTC 更强\n黄金市值使用 XAUT 价格和全球已开采黄金估算。" /></span>} icon="⚖️" accent={COLORS.gold}>
+      <div style={{ minHeight: 52, marginBottom: 4 }}>
+        {hovered ? (
+          <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontWeight: 700, color: COLORS.text }}>{fmtDate(hovered.date)}</span>
+              <span>Ratio: <span style={{ color: COLORS.accent, fontWeight: 800 }}>{fmtRatio(hovered.ratioPct)}</span></span>
+              <span>BTC: <span style={{ color: COLORS.text, fontWeight: 700 }}>{fmtPriceUsd(hovered.btcPrice)}</span></span>
+              <span>黄金: <span style={{ color: COLORS.text, fontWeight: 700 }}>{fmtPriceUsd(hovered.goldPrice)}</span></span>
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <span>BTC 市值: <span style={{ color: COLORS.text, fontWeight: 700 }}>{fmtUsdCompact(hovered.btcMarketCap)}</span></span>
+              <span>黄金市值: <span style={{ color: COLORS.text, fontWeight: 700 }}>{fmtUsdCompact(hovered.goldMarketCap)}</span></span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: COLORS.accent, lineHeight: 1.1 }}>{fmtRatio(latest.ratioPct)}</div>
+              <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>最近 {chartData.length} 天 · BTC 市值 / 黄金市值</div>
+            </div>
+            <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0, alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 12, height: 2, background: COLORS.accent, display: "inline-block", borderRadius: 1 }} /> Ratio
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: "100%", overflowX: "auto" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width: "100%", height: "auto", display: "block", cursor: "crosshair" }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          <defs>
+            <linearGradient id="bitcoinGoldRatioFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={COLORS.accent} stopOpacity="0.38" />
+              <stop offset="100%" stopColor={COLORS.accent} stopOpacity="0.06" />
+            </linearGradient>
+          </defs>
+
+          {[0, 0.5, 1].map((t) => {
+            const y = padT + chartH * t;
+            const val = yMax - denom * t;
+            return (
+              <g key={t}>
+                <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke={COLORS.muted} strokeWidth={0.5} opacity={0.18} />
+                <text x={padL - 8} y={y + 3} textAnchor="end" fontSize={9} fill={COLORS.muted}>{fmtRatio(val)}</text>
+              </g>
+            );
+          })}
+
+          <polygon points={areaPoints} fill="url(#bitcoinGoldRatioFill)" />
+          <polyline points={linePoints} fill="none" stroke={COLORS.accent} strokeWidth={2} opacity={0.95} />
+
+          {hoverIdx !== null && (() => {
+            const cx = padL + hoverIdx * gap;
+            const cy = ratioY(chartData[hoverIdx].ratioPct);
+            return (
+              <>
+                <line x1={cx} y1={padT} x2={cx} y2={padT + chartH} stroke={COLORS.accent} strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5} />
+                <circle cx={cx} cy={cy} r={4} fill={COLORS.accent} stroke={COLORS.card} strokeWidth={2} />
+              </>
+            );
+          })()}
+
+          {chartData.map((d, i) => {
+            const step = Math.max(1, Math.floor(chartData.length / 6));
+            if (i % step !== 0 && i !== chartData.length - 1) return null;
+            return (
+              <text key={i} x={padL + i * gap} y={H - 10} textAnchor="middle" fontSize={9} fill={COLORS.muted}>
+                {d.date.slice(5).replace("-", "/")}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8 }}>
+        {BITCOIN_GOLD_RANGES.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setRange(item.key)}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: range === item.key ? COLORS.text : COLORS.muted,
+              borderBottom: `2px solid ${range === item.key ? COLORS.accent : "transparent"}`,
+              padding: "4px 8px",
+              fontSize: 11,
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 // ========== BTC 底部分析标签页 ==========
 function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; analysis?: AIAnalysis | null; history?: MetricsHistoryResponse | null }) {
   const btc = data?.crypto?.BTC;
@@ -1961,6 +2176,9 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
       {/* ETF 净流入图表 */}
       <ETFFlowChart />
+
+      {/* Bitcoin / Gold Ratio 图表 */}
+      <BitcoinGoldRatioChart />
 
       {/* 历史对比卡片 */}
       <HistoryComparisonCard
