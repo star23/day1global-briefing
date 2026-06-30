@@ -1,5 +1,6 @@
 // ========== ETF 净流入历史 API ==========
 // 返回最近 90 天的 BTC ETF 每日净流入 + 7日累计净流入
+// BTC 价格从 CoinGecko 免费 API 获取（ETF flow API 不含价格）
 // 5 分钟内存缓存
 
 import { NextResponse } from "next/server";
@@ -28,6 +29,24 @@ function tsToDate(ts: number): string {
   return `${y}-${m}-${day}`;
 }
 
+async function fetchBtcPriceMap(): Promise<Record<string, number>> {
+  try {
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=100&interval=daily",
+      { cache: "no-store" },
+    );
+    if (!res.ok) return {};
+    const json = await res.json();
+    const map: Record<string, number> = {};
+    for (const [ts, price] of json.prices ?? []) {
+      map[tsToDate(ts)] = Math.round(price);
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 export async function GET() {
   const now = Date.now();
 
@@ -46,22 +65,22 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch(
-      `${COINGLASS_BASE}/api/etf/bitcoin/flow-history`,
-      {
+    const [flowRes, priceMap] = await Promise.all([
+      fetch(`${COINGLASS_BASE}/api/etf/bitcoin/flow-history`, {
         cache: "no-store",
         headers: { "CG-API-KEY": apiKey, accept: "application/json" },
-      },
-    );
+      }),
+      fetchBtcPriceMap(),
+    ]);
 
-    if (!res.ok) {
+    if (!flowRes.ok) {
       return NextResponse.json(
-        { error: `CoinGlass request failed: ${res.status}` },
+        { error: `CoinGlass request failed: ${flowRes.status}` },
         { status: 502 },
       );
     }
 
-    const json = await res.json();
+    const json = await flowRes.json();
     if (json.code !== "0" || !Array.isArray(json.data)) {
       return NextResponse.json(
         { error: "Invalid CoinGlass response" },
@@ -69,12 +88,13 @@ export async function GET() {
       );
     }
 
-    const rawData: { timestamp: number; price: number; flow_usd: number }[] = json.data;
+    const rawData: { timestamp: number; price?: number; flow_usd: number }[] = json.data;
 
     const result: ETFFlowPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
       const point = rawData[i];
       const flowUsd = Number(point.flow_usd) || 0;
+      const date = tsToDate(point.timestamp);
 
       // 7 日累计净流入
       let flow7dSum: number | null = null;
@@ -87,8 +107,8 @@ export async function GET() {
       }
 
       result.push({
-        date: tsToDate(point.timestamp),
-        price: point.price,
+        date,
+        price: point.price || priceMap[date] || 0,
         flowUsd: Math.round(flowUsd),
         flow7dSum,
       });
