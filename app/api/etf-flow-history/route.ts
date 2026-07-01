@@ -1,12 +1,23 @@
 // ========== ETF 净流入历史 API ==========
-// 返回最近 90 天的 BTC ETF 每日净流入 + 7日累计净流入
+// 返回指定区间的 BTC ETF 每日净流入 + 7日累计净流入
 // 5 分钟内存缓存
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 const COINGLASS_BASE = "https://open-api-v4.coinglass.com";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const RANGE_DAYS = {
+  "180d": 180,
+  "1y": 365,
+  "2y": 730,
+} as const;
+
+type RangeKey = keyof typeof RANGE_DAYS;
+
+const DEFAULT_RANGE: RangeKey = "180d";
 
 interface ETFFlowPoint {
   date: string;
@@ -18,6 +29,28 @@ interface ETFFlowPoint {
 let cachedResult: ETFFlowPoint[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000;
+
+function readRange(value: string | null): RangeKey {
+  if (value && value in RANGE_DAYS) return value as RangeKey;
+  return DEFAULT_RANGE;
+}
+
+function parseDateMs(date: string): number {
+  return Date.parse(`${date}T00:00:00.000Z`);
+}
+
+function filterByRange(data: ETFFlowPoint[], range: RangeKey): ETFFlowPoint[] {
+  if (data.length === 0) return [];
+  const latest = data[data.length - 1];
+  const latestMs = parseDateMs(latest.date);
+  if (!Number.isFinite(latestMs)) return data;
+
+  const cutoffMs = latestMs - (RANGE_DAYS[range] - 1) * MS_PER_DAY;
+  return data.filter((point) => {
+    const dateMs = parseDateMs(point.date);
+    return Number.isFinite(dateMs) && dateMs >= cutoffMs;
+  });
+}
 
 function tsToDate(ts: number): string {
   const ms = ts > 1e12 ? ts : ts * 1000;
@@ -83,11 +116,12 @@ async function fetchBtcPriceByDate(apiKey: string): Promise<Map<string, number>>
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const range = readRange(request.nextUrl.searchParams.get("range"));
   const now = Date.now();
 
   if (cachedResult && now - cacheTimestamp < CACHE_TTL) {
-    return NextResponse.json(cachedResult, {
+    return NextResponse.json(filterByRange(cachedResult, range), {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   }
@@ -127,7 +161,10 @@ export async function GET() {
       );
     }
 
-    const rawData: Record<string, unknown>[] = json.data;
+    const rawData: Record<string, unknown>[] = [...json.data].sort(
+      (a: Record<string, unknown>, b: Record<string, unknown>) =>
+        (readTimestamp(a) ?? 0) - (readTimestamp(b) ?? 0),
+    );
 
     const result: ETFFlowPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
@@ -153,19 +190,16 @@ export async function GET() {
       });
     }
 
-    // 最近 90 天
-    const last90 = result.slice(-90);
-
-    cachedResult = last90;
+    cachedResult = result;
     cacheTimestamp = now;
 
-    return NextResponse.json(last90, {
+    return NextResponse.json(filterByRange(result, range), {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (err) {
     console.error("[ETF Flow History] 获取失败:", err);
     if (cachedResult) {
-      return NextResponse.json(cachedResult, {
+      return NextResponse.json(filterByRange(cachedResult, range), {
         headers: { "Cache-Control": "s-maxage=60" },
       });
     }
