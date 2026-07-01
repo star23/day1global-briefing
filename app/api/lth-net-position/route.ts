@@ -1,12 +1,23 @@
 // ========== LTH 净持仓变化 API ==========
-// 返回最近 180 天的 LTH 每日净持仓变化 + 7日净持仓变化
+// 返回指定区间的 LTH 每日净持仓变化 + 7日净持仓变化
 // 5 分钟内存缓存，避免频繁调用 CoinGlass
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 const COINGLASS_BASE = "https://open-api-v4.coinglass.com";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const RANGE_DAYS = {
+  "180d": 180,
+  "1y": 365,
+  "2y": 730,
+} as const;
+
+type RangeKey = keyof typeof RANGE_DAYS;
+
+const DEFAULT_RANGE: RangeKey = "180d";
 
 interface LTHDataPoint {
   timestamp: number;
@@ -26,6 +37,28 @@ let cachedResult: LTHNetPositionPoint[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
+function readRange(value: string | null): RangeKey {
+  if (value && value in RANGE_DAYS) return value as RangeKey;
+  return DEFAULT_RANGE;
+}
+
+function parseDateMs(date: string): number {
+  return Date.parse(`${date}T00:00:00.000Z`);
+}
+
+function filterByRange(data: LTHNetPositionPoint[], range: RangeKey): LTHNetPositionPoint[] {
+  if (data.length === 0) return [];
+  const latest = data[data.length - 1];
+  const latestMs = parseDateMs(latest.date);
+  if (!Number.isFinite(latestMs)) return data;
+
+  const cutoffMs = latestMs - (RANGE_DAYS[range] - 1) * MS_PER_DAY;
+  return data.filter((point) => {
+    const dateMs = parseDateMs(point.date);
+    return Number.isFinite(dateMs) && dateMs >= cutoffMs;
+  });
+}
+
 function tsToDate(ts: number): string {
   // CoinGlass timestamp 可能是秒或毫秒
   const ms = ts > 1e12 ? ts : ts * 1000;
@@ -36,11 +69,12 @@ function tsToDate(ts: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const range = readRange(request.nextUrl.searchParams.get("range"));
   const now = Date.now();
 
   if (cachedResult && now - cacheTimestamp < CACHE_TTL) {
-    return NextResponse.json(cachedResult, {
+    return NextResponse.json(filterByRange(cachedResult, range), {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   }
@@ -77,7 +111,9 @@ export async function GET() {
       );
     }
 
-    const rawData: LTHDataPoint[] = json.data;
+    const rawData: LTHDataPoint[] = [...json.data].sort(
+      (a: LTHDataPoint, b: LTHDataPoint) => a.timestamp - b.timestamp,
+    );
 
     const result: LTHNetPositionPoint[] = [];
     for (let i = 0; i < rawData.length; i++) {
@@ -100,19 +136,16 @@ export async function GET() {
       });
     }
 
-    // 只返回最近 180 天
-    const last180 = result.slice(-180);
-
-    cachedResult = last180;
+    cachedResult = result;
     cacheTimestamp = now;
 
-    return NextResponse.json(last180, {
+    return NextResponse.json(filterByRange(result, range), {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (err) {
     console.error("[LTH Net Position] 获取失败:", err);
     if (cachedResult) {
-      return NextResponse.json(cachedResult, {
+      return NextResponse.json(filterByRange(cachedResult, range), {
         headers: { "Cache-Control": "s-maxage=60" },
       });
     }

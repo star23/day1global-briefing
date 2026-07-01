@@ -1169,9 +1169,50 @@ interface LTHNetPositionPoint {
   netChange7d: number | null;
 }
 
+type FlowHistoryRange = "180d" | "1y" | "2y";
+
+const FLOW_HISTORY_RANGES: { key: FlowHistoryRange; label: string }[] = [
+  { key: "180d", label: "180D" },
+  { key: "1y", label: "1Y" },
+  { key: "2y", label: "2Y" },
+];
+
+function FlowHistoryRangeSelector({
+  range,
+  onChange,
+}: {
+  range: FlowHistoryRange;
+  onChange: (range: FlowHistoryRange) => void;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8, borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8 }}>
+      {FLOW_HISTORY_RANGES.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onChange(item.key)}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: range === item.key ? COLORS.text : COLORS.muted,
+            borderBottom: `2px solid ${range === item.key ? COLORS.accent : "transparent"}`,
+            padding: "4px 8px",
+            fontSize: 11,
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function LTHNetPositionChart() {
+  const [range, setRange] = useState<FlowHistoryRange>("180d");
   const { data } = useSWR<LTHNetPositionPoint[] | { error?: string }>(
-    "/api/lth-net-position",
+    `/api/lth-net-position?range=${range}`,
     fetcher,
     { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
   );
@@ -1252,7 +1293,8 @@ function LTHNetPositionChart() {
     else setHoverIdx(null);
   };
 
-  const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
+  const hovered = hoverIdx !== null && hoverIdx < chartData.length ? chartData[hoverIdx] : null;
+  const rangeLabel = FLOW_HISTORY_RANGES.find((item) => item.key === range)?.label ?? "180D";
   const fmtDate = (d: string) => {
     const [y, m, day] = d.split("-");
     return `${y}.${parseInt(m)}.${parseInt(day)}`;
@@ -1276,7 +1318,7 @@ function LTHNetPositionChart() {
           </div>
         ) : (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.muted }}>最近 {chartData.length} 天 · 鼠标悬停查看详情</div>
+            <div style={{ fontSize: 11, color: COLORS.muted }}>{rangeLabel} · {chartData.length} 天 · 鼠标悬停查看详情</div>
             <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
                 <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
@@ -1351,7 +1393,7 @@ function LTHNetPositionChart() {
           />
 
           {/* 悬停竖线 + 圆点 */}
-          {hoverIdx !== null && (() => {
+          {hoverIdx !== null && hoverIdx < chartData.length && (() => {
             const cx = padL + hoverIdx * gap + gap / 2;
             const d = chartData[hoverIdx];
             const priceY = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
@@ -1393,6 +1435,14 @@ function LTHNetPositionChart() {
           })}
         </svg>
       </div>
+
+      <FlowHistoryRangeSelector
+        range={range}
+        onChange={(nextRange) => {
+          setRange(nextRange);
+          setHoverIdx(null);
+        }}
+      />
     </Card>
   );
 }
@@ -1406,8 +1456,9 @@ interface ETFFlowPoint {
 }
 
 function ETFFlowChart() {
+  const [range, setRange] = useState<FlowHistoryRange>("180d");
   const { data } = useSWR<ETFFlowPoint[] | { error?: string }>(
-    "/api/etf-flow-history",
+    `/api/etf-flow-history?range=${range}`,
     fetcher,
     { refreshInterval: 30 * 60 * 1000, revalidateOnFocus: false }
   );
@@ -1490,7 +1541,8 @@ function ETFFlowChart() {
     else setHoverIdx(null);
   };
 
-  const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
+  const hovered = hoverIdx !== null && hoverIdx < chartData.length ? chartData[hoverIdx] : null;
+  const rangeLabel = FLOW_HISTORY_RANGES.find((item) => item.key === range)?.label ?? "180D";
   const fmtDate = (d: string) => {
     const [y, m, day] = d.split("-");
     return `${y}.${parseInt(m)}.${parseInt(day)}`;
@@ -1517,7 +1569,7 @@ function ETFFlowChart() {
           </div>
         ) : (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.muted }}>最近 {chartData.length} 天 · 鼠标悬停查看详情</div>
+            <div style={{ fontSize: 11, color: COLORS.muted }}>{rangeLabel} · {chartData.length} 条数据 · 鼠标悬停查看详情</div>
             <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
                 <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
@@ -1579,7 +1631,7 @@ function ETFFlowChart() {
           )}
 
           {/* 悬停竖线 + 圆点 */}
-          {hoverIdx !== null && (() => {
+          {hoverIdx !== null && hoverIdx < chartData.length && (() => {
             const cx = padL + hoverIdx * gap + gap / 2;
             const d = chartData[hoverIdx];
             const priceY = d.price != null && prices.length > 0 ? padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH : null;
@@ -1618,6 +1670,14 @@ function ETFFlowChart() {
           })}
         </svg>
       </div>
+
+      <FlowHistoryRangeSelector
+        range={range}
+        onChange={(nextRange) => {
+          setRange(nextRange);
+          setHoverIdx(null);
+        }}
+      />
     </Card>
   );
 }
