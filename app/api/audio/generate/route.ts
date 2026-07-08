@@ -54,6 +54,16 @@ export async function GET(request: NextRequest) {
 
     // 上传到 Vercel Blob
     const today = getTodayBeijing();
+
+    try {
+      const cleanup = await cleanupOldBriefingAudio();
+      console.log(
+        `[Audio Generate] 上传前旧音频清理完成: 删除 ${cleanup.deleted} 个，保留最近 ${cleanup.retentionDays} 天`
+      );
+    } catch (cleanupErr) {
+      console.error("[Audio Generate] 上传前旧音频清理失败:", cleanupErr);
+    }
+
     const blob = await uploadBriefingAudio(today, audioBuffer);
 
     // 在 Redis 只存 URL（很小），24h 过期

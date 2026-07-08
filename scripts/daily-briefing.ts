@@ -119,6 +119,16 @@ async function main() {
 
       if (process.env.BLOB_READ_WRITE_TOKEN) {
         const today = getTodayBeijing();
+
+        try {
+          const cleanup = await cleanupOldBriefingAudio();
+          console.log(
+            `  ✓ 上传前旧音频清理完成: 删除 ${cleanup.deleted} 个，保留最近 ${cleanup.retentionDays} 天`
+          );
+        } catch (cleanupErr) {
+          console.error("  ✗ 上传前旧音频清理失败:", cleanupErr);
+        }
+
         const blob = await uploadBriefingAudio(today, audioBuffer);
         await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
         console.log(`  ✓ Blob URL: ${blob.url}`);

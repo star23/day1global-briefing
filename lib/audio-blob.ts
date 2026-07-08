@@ -7,7 +7,7 @@ import {
 import { getTodayBeijing } from "./date-utils";
 
 export const AUDIO_BLOB_PREFIX = "briefing-audio/";
-export const AUDIO_RETENTION_DAYS = 14;
+export const AUDIO_RETENTION_DAYS = 7;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const AUDIO_DATE_PATH_RE = /^briefing-audio\/(\d{4}-\d{2}-\d{2}).*\.mp3$/;
