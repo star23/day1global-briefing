@@ -108,6 +108,21 @@ const TABS = [
   { id: "portfolio", label: "持仓" },
   { id: "news", label: "新闻" },
 ];
+const DEFAULT_TAB_ID = "overview";
+const TAB_IDS = new Set(TABS.map((tab) => tab.id));
+
+function readTabFromHash(): string {
+  if (typeof window === "undefined") return DEFAULT_TAB_ID;
+  const tabId = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+  return TAB_IDS.has(tabId) ? tabId : DEFAULT_TAB_ID;
+}
+
+function writeTabHash(tabId: string) {
+  if (typeof window === "undefined") return;
+  const nextHash = `#${encodeURIComponent(tabId)}`;
+  if (window.location.hash === nextHash) return;
+  window.history.pushState(null, "", nextHash);
+}
 
 // ---- 股票/加密元数据 ----
 const STOCK_META: Record<string, { name: string; note: string }> = {
@@ -350,7 +365,7 @@ function LoadingState() {
 
 // ========== 主组件 ==========
 export default function MorningBriefing() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(readTabFromHash);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem("theme") as "dark" | "light") || "dark";
@@ -367,6 +382,22 @@ export default function MorningBriefing() {
     localStorage.setItem("theme", theme);
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    const handleHashChange = () => setActiveTab(readTabFromHash());
+    handleHashChange();
+    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handleHashChange);
+    };
+  }, []);
+
+  const selectTab = (tabId: string) => {
+    setActiveTab(tabId);
+    writeTabHash(tabId);
+  };
 
   const { data, error, isLoading } = useSWR<MarketDataResponse>(
     "/api/market-data",
@@ -647,7 +678,8 @@ export default function MorningBriefing() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => selectTab(t.id)}
+              title={`分享链接 #${t.id}`}
               style={{
                 padding: "7px 16px",
                 borderRadius: 8,
