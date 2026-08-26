@@ -1973,7 +1973,18 @@ interface NormalizedMag7Series extends Mag7BtcPriceSeries {
   latestMultiple: number;
 }
 
+interface DrawdownPeriod {
+  peakDate: string;
+  troughDate: string;
+  endDate: string;
+  peakPrice: number;
+  troughPrice: number;
+  maxDrawdownPct: number;
+  recovered: boolean;
+}
+
 const MAG7_COMMON_START_DATE = "2012-05-18";
+const MAJOR_DRAWDOWN_THRESHOLD = -50;
 
 function formatChartDate(date: string): string {
   const [y, m, d] = date.split("-");
@@ -2006,6 +2017,66 @@ function pickLogTicks(min: number, max: number, preferredTicks: number[]): numbe
   const logMin = Math.log10(min);
   const logMax = Math.log10(max);
   return Array.from({ length: 5 }, (_, index) => 10 ** (logMin + ((logMax - logMin) * index) / 4));
+}
+
+function findMajorDrawdowns(points: Mag7BtcPricePoint[]): DrawdownPeriod[] {
+  const chartPoints = points
+    .filter((point) => point.date >= MAG7_COMMON_START_DATE && Number.isFinite(point.price) && point.price > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (chartPoints.length < 2) return [];
+
+  const periods: DrawdownPeriod[] = [];
+  let peak = chartPoints[0];
+  let trough = chartPoints[0];
+  let activePeriod: DrawdownPeriod | null = null;
+
+  for (let i = 1; i < chartPoints.length; i++) {
+    const point = chartPoints[i];
+
+    if (!activePeriod) {
+      if (point.price >= peak.price) {
+        peak = point;
+        trough = point;
+        continue;
+      }
+
+      const drawdownPct = ((point.price - peak.price) / peak.price) * 100;
+      if (drawdownPct <= MAJOR_DRAWDOWN_THRESHOLD) {
+        trough = point;
+        activePeriod = {
+          peakDate: peak.date,
+          troughDate: trough.date,
+          endDate: point.date,
+          peakPrice: peak.price,
+          troughPrice: trough.price,
+          maxDrawdownPct: drawdownPct,
+          recovered: false,
+        };
+      }
+      continue;
+    }
+
+    if (point.price < trough.price) {
+      trough = point;
+      activePeriod.troughDate = point.date;
+      activePeriod.troughPrice = point.price;
+      activePeriod.maxDrawdownPct = ((point.price - activePeriod.peakPrice) / activePeriod.peakPrice) * 100;
+    }
+
+    activePeriod.endDate = point.date;
+
+    if (point.price >= activePeriod.peakPrice) {
+      activePeriod.recovered = true;
+      periods.push(activePeriod);
+      activePeriod = null;
+      peak = point;
+      trough = point;
+    }
+  }
+
+  if (activePeriod) periods.push(activePeriod);
+  return periods;
 }
 
 function Mag7LogPerformanceChart({ series }: { series: Mag7BtcPriceSeries[] }) {
@@ -2104,6 +2175,14 @@ function Mag7LogPerformanceChart({ series }: { series: Mag7BtcPriceSeries[] }) {
       .filter((item): item is { symbol: string; name: string; color: string; price: number; multiple: number } => item !== null)
     : [];
   const yTicks = pickLogTicks(10 ** logMin, 10 ** logMax, [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]).reverse();
+  const drawdownRows = series.flatMap((item) =>
+    findMajorDrawdowns(item.points).map((period) => ({
+      symbol: item.symbol,
+      name: item.name,
+      color: item.color,
+      ...period,
+    }))
+  );
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return;
@@ -2262,6 +2341,51 @@ function Mag7LogPerformanceChart({ series }: { series: Mag7BtcPriceSeries[] }) {
 
       <div style={{ borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8, fontSize: 11, color: COLORS.muted }}>
         全历史数据 · 价格倍数对数轴
+      </div>
+
+      <div style={{ borderTop: `1px solid ${COLORS.cardBorder}`, marginTop: 12, paddingTop: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "baseline", marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: COLORS.text }}>超过 50% 回撤区间</div>
+          <div style={{ fontSize: 10, color: COLORS.muted }}>从历史高点跌破 -50% 到重新收复该高点</div>
+        </div>
+
+        {drawdownRows.length === 0 ? (
+          <div style={{ fontSize: 12, color: COLORS.muted, padding: "8px 0" }}>没有超过 50% 的回撤区间</div>
+        ) : (
+          <div style={{ width: "100%", overflowX: "auto" }}>
+            <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 11 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${COLORS.cardBorder}` }}>
+                  {["标的", "时间段", "最高价格", "最低价格", "最大回撤", "状态"].map((header) => (
+                    <th key={header} style={{ textAlign: "left", padding: "7px 6px", color: COLORS.muted, fontWeight: 700 }}>{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {drawdownRows.map((row, index) => (
+                  <tr key={`${row.symbol}-${row.peakDate}-${row.troughDate}-${index}`} style={{ borderBottom: `1px solid ${COLORS.cardBorder}44` }}>
+                    <td style={{ padding: "7px 6px", color: row.color, fontWeight: 900 }}>{row.symbol}</td>
+                    <td style={{ padding: "7px 6px", color: COLORS.text, whiteSpace: "nowrap" }}>
+                      {formatChartDate(row.peakDate)} - {row.recovered ? formatChartDate(row.endDate) : "至今"}
+                    </td>
+                    <td style={{ padding: "7px 6px", color: COLORS.text, whiteSpace: "nowrap" }}>
+                      {formatUsd(row.peakPrice)}
+                      <span style={{ color: COLORS.muted }}> · {formatChartDate(row.peakDate)}</span>
+                    </td>
+                    <td style={{ padding: "7px 6px", color: COLORS.text, whiteSpace: "nowrap" }}>
+                      {formatUsd(row.troughPrice)}
+                      <span style={{ color: COLORS.muted }}> · {formatChartDate(row.troughDate)}</span>
+                    </td>
+                    <td style={{ padding: "7px 6px", color: COLORS.red, fontWeight: 800 }}>{row.maxDrawdownPct.toFixed(1)}%</td>
+                    <td style={{ padding: "7px 6px", color: row.recovered ? COLORS.green : COLORS.yellow, fontWeight: 700 }}>
+                      {row.recovered ? "已收复" : "进行中"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </Card>
   );
