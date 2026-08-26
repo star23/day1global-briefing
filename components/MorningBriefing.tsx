@@ -104,6 +104,7 @@ const TABS = [
   { id: "overview", label: "总览" },
   { id: "sentiment", label: "市场情绪" },
   { id: "btc-bottom", label: "BTC抄底/逃顶" },
+  { id: "mag7-btc-log", label: "Mag7+BTC 对数股价图" },
   { id: "portfolio", label: "持仓" },
   { id: "news", label: "新闻" },
 ];
@@ -674,6 +675,7 @@ export default function MorningBriefing() {
             {activeTab === "overview" && <OverviewTab data={data} analysis={analysis} />}
             {activeTab === "sentiment" && <SentimentTab data={data} analysis={analysis} />}
             {activeTab === "btc-bottom" && <BTCBottomTab data={data} analysis={analysis} history={metricsHistory} />}
+            {activeTab === "mag7-btc-log" && <Mag7BtcLogPriceTab />}
             {activeTab === "portfolio" && <PortfolioTab data={data} />}
             {activeTab === "news" && <NewsTab analysis={analysis} />}
           </>
@@ -1892,6 +1894,374 @@ function BitcoinGoldRatioChart() {
             {item.label}
           </button>
         ))}
+      </div>
+    </Card>
+  );
+}
+
+// ========== Mag7 + BTC 对数股价图 ==========
+type Mag7BtcRange = "6m" | "1y" | "2y" | "5y" | "max";
+
+interface Mag7BtcPricePoint {
+  date: string;
+  price: number;
+}
+
+interface Mag7BtcPriceSeries {
+  symbol: string;
+  name: string;
+  color: string;
+  points: Mag7BtcPricePoint[];
+  firstPrice: number;
+  latestPrice: number;
+  returnPct: number;
+}
+
+interface Mag7BtcPriceResponse {
+  range: Mag7BtcRange;
+  updatedAt: string;
+  series: Mag7BtcPriceSeries[];
+}
+
+function Mag7BtcLogPriceTab() {
+  const { data } = useSWR<Mag7BtcPriceResponse | { error?: string }>(
+    "/api/mag7-btc-log-prices",
+    fetcher,
+    { refreshInterval: 60 * 60 * 1000, revalidateOnFocus: false }
+  );
+
+  if (!data) {
+    return (
+      <Card title="Mag7+BTC 对数股价图" icon="📈" accent={COLORS.purple}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据加载中...</div>
+      </Card>
+    );
+  }
+
+  if (!("series" in data) || data.series.length === 0) {
+    return (
+      <Card title="Mag7+BTC 对数股价图" icon="📈" accent={COLORS.purple}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>Mag7+BTC 历史价格暂不可用</div>
+      </Card>
+    );
+  }
+
+  const validSeries = data.series
+    .map((series) => ({
+      ...series,
+      points: series.points.filter((point) => Number.isFinite(point.price) && point.price > 0),
+    }))
+    .filter((series) => series.points.length > 1);
+
+  if (validSeries.length === 0) {
+    return (
+      <Card title="Mag7+BTC 对数股价图" icon="📈" accent={COLORS.purple}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据不足</div>
+      </Card>
+    );
+  }
+
+  return <Mag7LogPerformanceChart series={validSeries} />;
+}
+
+interface NormalizedPricePoint extends Mag7BtcPricePoint {
+  multiple: number;
+}
+
+interface NormalizedMag7Series extends Mag7BtcPriceSeries {
+  normalizedPoints: NormalizedPricePoint[];
+  latestMultiple: number;
+}
+
+const MAG7_COMMON_START_DATE = "2012-05-18";
+
+function formatChartDate(date: string): string {
+  const [y, m, d] = date.split("-");
+  return `${y}.${parseInt(m)}.${parseInt(d)}`;
+}
+
+function formatUsd(value: number): string {
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: value >= 1000 ? 0 : 2,
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  })}`;
+}
+
+function formatMultiple(value: number): string {
+  if (value >= 100) return `${value.toFixed(0)}×`;
+  if (value >= 10) return `${value.toFixed(1)}×`;
+  return `${value.toFixed(2)}×`;
+}
+
+function getReturnColor(value: number): string {
+  if (value > 1) return COLORS.green;
+  if (value < 1) return COLORS.red;
+  return COLORS.muted;
+}
+
+function pickLogTicks(min: number, max: number, preferredTicks: number[]): number[] {
+  const ticks = preferredTicks.filter((tick) => tick >= min && tick <= max);
+  if (ticks.length >= 4) return ticks;
+
+  const logMin = Math.log10(min);
+  const logMax = Math.log10(max);
+  return Array.from({ length: 5 }, (_, index) => 10 ** (logMin + ((logMax - logMin) * index) / 4));
+}
+
+function Mag7LogPerformanceChart({ series }: { series: Mag7BtcPriceSeries[] }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [hiddenSymbols, setHiddenSymbols] = useState<string[]>([]);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const visibleSeries = series.filter((item) => !hiddenSymbols.includes(item.symbol));
+  const selectedSeries = visibleSeries.length > 0 ? visibleSeries : series;
+  const allDates = Array.from(new Set(
+    selectedSeries.flatMap((item) => item.points
+      .filter((point) => point.date >= MAG7_COMMON_START_DATE)
+      .map((point) => point.date))
+  )).sort();
+
+  if (allDates.length < 2) {
+    return (
+      <Card title="Mag7+BTC：共同起点以来的价格表现" icon="📈" accent={COLORS.purple}>
+        <div style={{ textAlign: "center", padding: 20, color: COLORS.muted, fontSize: 12 }}>数据不足</div>
+      </Card>
+    );
+  }
+
+  const normalizeSeries = (points: Mag7BtcPricePoint[]): NormalizedPricePoint[] => {
+    const filteredPoints = points.filter((point) => point.date >= MAG7_COMMON_START_DATE);
+    const aligned: NormalizedPricePoint[] = [];
+    let pointIndex = 0;
+    let lastPoint: Mag7BtcPricePoint | null = null;
+    let basePrice: number | null = null;
+
+    for (const date of allDates) {
+      while (pointIndex < filteredPoints.length && filteredPoints[pointIndex].date <= date) {
+        lastPoint = filteredPoints[pointIndex];
+        if (basePrice === null) basePrice = lastPoint.price;
+        pointIndex++;
+      }
+      if (lastPoint && basePrice) aligned.push({ date, price: lastPoint.price, multiple: lastPoint.price / basePrice });
+    }
+
+    return aligned;
+  };
+
+  const chartSeries: NormalizedMag7Series[] = selectedSeries
+    .map((item) => {
+      const normalizedPoints = normalizeSeries(item.points);
+      const latestMultiple = normalizedPoints[normalizedPoints.length - 1]?.multiple ?? 1;
+      return { ...item, normalizedPoints, latestMultiple };
+    })
+    .filter((item) => item.normalizedPoints.length > 1);
+
+  const W = 820, H = 320;
+  const padL = 60, padR = 24, padT = 22, padB = 38;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const dateIndexByDate = new Map(allDates.map((date, index) => [date, index]));
+  const gap = allDates.length > 1 ? chartW / (allDates.length - 1) : chartW;
+  const multiples = chartSeries.flatMap((item) => item.normalizedPoints.map((point) => point.multiple));
+  const rawMin = Math.min(1, ...multiples);
+  const rawMax = Math.max(1, ...multiples);
+  const rawLogMin = Math.log10(rawMin);
+  const rawLogMax = Math.log10(rawMax);
+  const logSpan = Math.max(rawLogMax - rawLogMin, 0.1);
+  const logMin = rawLogMin - logSpan * 0.06;
+  const logMax = rawLogMax + logSpan * 0.06;
+  const logDenom = logMax - logMin || 1;
+  const xForDate = (date: string) => padL + (dateIndexByDate.get(date) ?? 0) * gap;
+  const yForMultiple = (multiple: number) => padT + chartH - ((Math.log10(multiple) - logMin) / logDenom) * chartH;
+  const hoveredDate = hoverIdx !== null ? allDates[hoverIdx] : null;
+  const pointAt = (points: NormalizedPricePoint[], date: string) => points.find((point) => point.date === date) ?? null;
+  const buildLinePoints = (points: NormalizedPricePoint[]) =>
+    points.map((point) => `${xForDate(point.date)},${yForMultiple(point.multiple)}`).join(" ");
+  const performanceRows = chartSeries.map((series) => {
+    const latest = series.normalizedPoints[series.normalizedPoints.length - 1];
+    return {
+      symbol: series.symbol,
+      name: series.name,
+      color: series.color,
+      latestPrice: latest.price,
+      latestMultiple: latest.multiple,
+    };
+  });
+  const bestRow = performanceRows.reduce((best, item) => item.latestMultiple > best.latestMultiple ? item : best, performanceRows[0]);
+  const hoverRows = hoveredDate
+    ? chartSeries
+      .map((series) => {
+        const point = pointAt(series.normalizedPoints, hoveredDate);
+        if (!point) return null;
+        return {
+          symbol: series.symbol,
+          name: series.name,
+          color: series.color,
+          price: point.price,
+          multiple: point.multiple,
+        };
+      })
+      .filter((item): item is { symbol: string; name: string; color: string; price: number; multiple: number } => item !== null)
+    : [];
+  const yTicks = pickLogTicks(10 ** logMin, 10 ** logMax, [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]).reverse();
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    const idx = allDates.length > 1 ? Math.round((x - padL) / gap) : 0;
+    if (idx >= 0 && idx < allDates.length) setHoverIdx(idx);
+    else setHoverIdx(null);
+  };
+
+  const toggleSeries = (symbol: string) => {
+    setHiddenSymbols((current) => {
+      if (current.includes(symbol)) return current.filter((item) => item !== symbol);
+      const visibleCount = series.filter((item) => !current.includes(item.symbol)).length;
+      if (visibleCount <= 1) return current;
+      return [...current, symbol];
+    });
+  };
+
+  return (
+    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Mag7+BTC：共同起点以来的价格表现<InfoTooltip text="以 META 上市日 2012-05-18 为共同起点，并把各标的当天可用价格设为 1×。\n\n纵轴为对数刻度，比较股票拆股调整价格与 BTC 美元价格的倍数表现。" /></span>} icon="📈" accent={COLORS.purple}>
+      <div style={{ minHeight: 66, marginBottom: 6 }}>
+        {hoveredDate && hoverRows.length > 0 ? (
+          <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.8 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 2 }}>
+              <span style={{ fontWeight: 700, color: COLORS.text }}>{formatChartDate(hoveredDate)}</span>
+              <span>起点: <span style={{ color: COLORS.text, fontWeight: 700 }}>2012.5.18 = 1×</span></span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: "2px 12px" }}>
+              {hoverRows.map((row) => (
+                <span key={row.symbol} style={{ whiteSpace: "nowrap" }}>
+                  <span style={{ color: row.color, fontWeight: 800 }}>{row.symbol}</span>
+                  <span style={{ color: getReturnColor(row.multiple), fontWeight: 700 }}> {formatMultiple(row.multiple)}</span>
+                  <span style={{ color: COLORS.text, fontWeight: 700 }}> {formatUsd(row.price)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: bestRow.color, lineHeight: 1.15 }}>
+                {bestRow.symbol} {formatMultiple(bestRow.latestMultiple)}
+              </div>
+              <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>
+                2012.5.18 = 1× · 至 {formatChartDate(allDates[allDates.length - 1])} · 对数刻度
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, fontSize: 10, color: COLORS.muted, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <span>最新: {formatChartDate(allDates[allDates.length - 1])}</span>
+              <span>标的: {series.length}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: "100%", overflowX: "auto" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width: "100%", height: "auto", display: "block", cursor: "crosshair" }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          {yTicks.map((tick) => {
+            const y = yForMultiple(tick);
+            return (
+              <g key={tick}>
+                <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke={COLORS.muted} strokeWidth={0.5} opacity={0.18} />
+                <text x={padL - 8} y={y + 3} textAnchor="end" fontSize={9} fill={COLORS.muted}>{formatMultiple(tick)}</text>
+              </g>
+            );
+          })}
+
+          {chartSeries.map((series) => (
+            <polyline
+              key={series.symbol}
+              points={buildLinePoints(series.normalizedPoints)}
+              fill="none"
+              stroke={series.color}
+              strokeWidth={1.8}
+              opacity={0.85}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {hoverIdx !== null && hoveredDate && (() => {
+            const cx = padL + hoverIdx * gap;
+            return (
+              <>
+                <line x1={cx} y1={padT} x2={cx} y2={padT + chartH} stroke={COLORS.accent} strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5} />
+                {chartSeries.map((series) => {
+                  const point = pointAt(series.normalizedPoints, hoveredDate);
+                  if (!point) return null;
+                  return (
+                    <circle
+                      key={series.symbol}
+                      cx={cx}
+                      cy={yForMultiple(point.multiple)}
+                      r={2.8}
+                      fill={series.color}
+                      stroke={COLORS.card}
+                      strokeWidth={1.4}
+                    />
+                  );
+                })}
+              </>
+            );
+          })()}
+
+          {allDates.map((date, index) => {
+            const step = Math.max(1, Math.floor(allDates.length / 6));
+            if (index % step !== 0 && index !== allDates.length - 1) return null;
+            return (
+              <text key={date} x={padL + index * gap} y={H - 10} textAnchor="middle" fontSize={9} fill={COLORS.muted}>
+                {date.slice(0, 4)}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2, marginBottom: 8 }}>
+        {series.map((series) => {
+          const isHidden = hiddenSymbols.includes(series.symbol);
+          return (
+            <button
+              key={series.symbol}
+              type="button"
+              onClick={() => toggleSeries(series.symbol)}
+              style={{
+                border: `1px solid ${isHidden ? COLORS.cardBorder : series.color}`,
+                background: isHidden ? "transparent" : `${series.color}18`,
+                color: isHidden ? COLORS.muted : COLORS.text,
+                borderRadius: 8,
+                padding: "5px 8px",
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                opacity: isHidden ? 0.5 : 1,
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: 7, background: series.color, display: "inline-block" }} />
+              {series.symbol}
+              <span style={{ color: getReturnColor((performanceRows.find((row) => row.symbol === series.symbol)?.latestMultiple ?? 1)) }}>
+                {formatMultiple(performanceRows.find((row) => row.symbol === series.symbol)?.latestMultiple ?? 1)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8, fontSize: 11, color: COLORS.muted }}>
+        全历史数据 · 价格倍数对数轴
       </div>
     </Card>
   );
