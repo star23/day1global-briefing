@@ -23,6 +23,29 @@ const BASE_URL = process.env.BRIEFING_BASE_URL || "https://brief.day1global.xyz"
 const skipTelegram = process.argv.includes("--skip-telegram");
 const telegramAudioOnly = process.argv.includes("--telegram-audio-only");
 const telegramTextOnly = process.argv.includes("--telegram-text-only");
+const forceRun = process.argv.includes("--force");
+
+const RUN_LOCK_TTL_SECONDS = 20 * 60;
+const COMPLETION_TTL_SECONDS = 3 * 24 * 60 * 60;
+
+interface ActiveRunLock {
+  redis: Redis;
+  key: string;
+  value: string;
+}
+
+let activeRunLock: ActiveRunLock | null = null;
+
+async function releaseActiveRunLock(): Promise<void> {
+  const lock = activeRunLock;
+  if (!lock) return;
+
+  activeRunLock = null;
+  const activeValue = await lock.redis.get<string>(lock.key);
+  if (activeValue === lock.value) {
+    await lock.redis.del(lock.key);
+  }
+}
 
 async function main() {
   console.log("=== Day1Global 每日早报生成 ===");
@@ -31,6 +54,7 @@ async function main() {
   if (skipTelegram) console.log("⚠ 跳过 Telegram 推送 (--skip-telegram)");
   if (telegramAudioOnly) console.log("⚠ 只推送音频 (--telegram-audio-only)");
   if (telegramTextOnly) console.log("⚠ 只推送文字 (--telegram-text-only)");
+  if (forceRun) console.log("⚠ 强制重跑，忽略当日完成标记 (--force)");
   console.log("");
 
   // 检查必需的环境变量
@@ -47,6 +71,35 @@ async function main() {
     token: process.env.KV_REST_API_TOKEN!,
   });
 
+  const runDate = getTodayBeijing();
+  const lockKey = `daily-briefing:lock:${runDate}`;
+  const completedKey = `daily-briefing:completed:${runDate}`;
+  const lockValue = [
+    process.env.GITHUB_RUN_ID || `local-${Date.now()}`,
+    process.env.GITHUB_RUN_ATTEMPT || "1",
+  ].join(":");
+
+  if (!forceRun) {
+    const completed = await redis.get(completedKey);
+    if (completed) {
+      console.log(`✓ ${runDate} 已完成，本次兜底触发跳过`);
+      return;
+    }
+  }
+
+  const lockAcquired = await redis.set(lockKey, lockValue, {
+    nx: true,
+    ex: RUN_LOCK_TTL_SECONDS,
+  });
+
+  if (lockAcquired !== "OK") {
+    console.log(`- ${runDate} 已有任务运行中，本次触发跳过`);
+    return;
+  }
+
+  activeRunLock = { redis, key: lockKey, value: lockValue };
+  console.log(`✓ 已获取 ${runDate} 当日运行锁`);
+
   // ---- 第一步：获取市场数据 ----
   console.log("[1/7] 获取市场数据...");
   const dataRes = await fetch(`${BASE_URL}/api/market-data`);
@@ -62,9 +115,8 @@ async function main() {
   try {
     await ensureTable();
     await migrateAddColumns();
-    const today = getTodayBeijing();
     await upsertDailyMetrics({
-      date: today,
+      date: runDate,
       btcPrice: data.crypto?.BTC?.price ?? null,
       weeklyRsi: data.btcMetrics?.weeklyRsi ?? null,
       volume24h: data.btcMetrics?.volume24h ?? null,
@@ -83,7 +135,7 @@ async function main() {
       fundingRate: data.btcMetrics?.fundingRate ?? null,
       longShortRatio: data.btcMetrics?.longShortRatio ?? null,
     });
-    console.log(`  ✓ 已写入 (${today})`);
+    console.log(`  ✓ 已写入 (${runDate})`);
   } catch (dbErr) {
     console.error("  ✗ Postgres 写入失败:", dbErr);
   }
@@ -118,8 +170,6 @@ async function main() {
       console.log(`  ✓ 音频大小: ${sizeMB} MB`);
 
       if (process.env.BLOB_READ_WRITE_TOKEN) {
-        const today = getTodayBeijing();
-
         try {
           const cleanup = await cleanupOldBriefingAudio();
           console.log(
@@ -129,7 +179,7 @@ async function main() {
           console.error("  ✗ 上传前旧音频清理失败:", cleanupErr);
         }
 
-        const blob = await uploadBriefingAudio(today, audioBuffer);
+        const blob = await uploadBriefingAudio(runDate, audioBuffer);
         await redis.set("briefing-audio-url", blob.url, { ex: 86400 });
         console.log(`  ✓ Blob URL: ${blob.url}`);
 
@@ -179,10 +229,33 @@ async function main() {
     console.log("[7/7] 未设置 Telegram 环境变量，跳过");
   }
 
+  const partialManualRun =
+    skipTelegram || telegramAudioOnly || telegramTextOnly;
+
+  if (partialManualRun) {
+    console.log("- 部分手动运行不写入当日完成标记");
+  } else {
+    await redis.set(
+      completedKey,
+      {
+        completedAt: new Date().toISOString(),
+        githubRunId: process.env.GITHUB_RUN_ID || null,
+      },
+      { ex: COMPLETION_TTL_SECONDS }
+    );
+    console.log(`✓ 已写入 ${runDate} 当日完成标记`);
+  }
+
+  await releaseActiveRunLock();
   console.log("\n=== 完成 ===");
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
+  try {
+    await releaseActiveRunLock();
+  } catch (lockErr) {
+    console.error("❌ 释放当日运行锁失败:", lockErr);
+  }
   console.error("\n❌ 流程失败:", err);
   process.exit(1);
 });
