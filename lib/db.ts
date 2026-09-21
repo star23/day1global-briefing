@@ -11,6 +11,7 @@ export async function ensureTable() {
       id         SERIAL PRIMARY KEY,
       date       DATE NOT NULL UNIQUE,
       btc_price  NUMERIC,
+      ahr999     NUMERIC,
       weekly_rsi NUMERIC,
       volume_24h NUMERIC,
       volume_change_pct NUMERIC,
@@ -32,6 +33,7 @@ export async function ensureTable() {
 /** 为已有表添加新列 (幂等，忽略 already exists 错误) */
 export async function migrateAddColumns() {
   const newCols = [
+    { name: "ahr999", type: "NUMERIC" },
     { name: "nupl", type: "NUMERIC" },
     { name: "lth_mvrv", type: "NUMERIC" },
     { name: "ma365_price", type: "NUMERIC" },
@@ -53,6 +55,7 @@ export async function migrateAddColumns() {
 export async function upsertDailyMetrics(row: {
   date: string; // YYYY-MM-DD
   btcPrice: number | null;
+  ahr999: number | null;
   weeklyRsi: number | null;
   volume24h: number | null;
   volumeChangePct: number | null;
@@ -72,17 +75,18 @@ export async function upsertDailyMetrics(row: {
 }) {
   await sql`
     INSERT INTO btc_metrics_daily
-      (date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
+      (date, btc_price, ahr999, weekly_rsi, volume_24h, volume_change_pct,
        sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed,
        nupl, lth_mvrv, ma365_price, ma365_ratio,
        etf_flow_usd, funding_rate, long_short_ratio)
     VALUES
-      (${row.date}, ${row.btcPrice}, ${row.weeklyRsi}, ${row.volume24h}, ${row.volumeChangePct},
+      (${row.date}, ${row.btcPrice}, ${row.ahr999}, ${row.weeklyRsi}, ${row.volume24h}, ${row.volumeChangePct},
        ${row.sthSopr}, ${row.lthSopr}, ${row.lthSupplyPct}, ${row.wma200Price}, ${row.wma200Multiplier}, ${row.fearGreed},
        ${row.nupl}, ${row.lthMvrv}, ${row.ma365Price}, ${row.ma365Ratio},
        ${row.etfFlowUsd}, ${row.fundingRate}, ${row.longShortRatio})
     ON CONFLICT (date) DO UPDATE SET
       btc_price         = EXCLUDED.btc_price,
+      ahr999            = EXCLUDED.ahr999,
       weekly_rsi        = EXCLUDED.weekly_rsi,
       volume_24h        = EXCLUDED.volume_24h,
       volume_change_pct = EXCLUDED.volume_change_pct,
@@ -148,7 +152,7 @@ export async function getComparisonMetrics() {
       LEFT JOIN btc_metrics_daily m
         ON m.date <= t.target
     )
-    SELECT label, id, date, btc_price, weekly_rsi, volume_24h, volume_change_pct,
+    SELECT label, id, date, btc_price, ahr999, weekly_rsi, volume_24h, volume_change_pct,
            sth_sopr, lth_sopr, lth_supply_pct, wma200_price, wma200_multiplier, fear_greed,
            nupl, lth_mvrv, ma365_price, ma365_ratio,
            etf_flow_usd, funding_rate, long_short_ratio, created_at

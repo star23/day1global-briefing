@@ -1,8 +1,9 @@
 // ========== 获取 BTC 链上/技术指标 ==========
 // 从 OKX 获取 K 线数据计算周线 RSI 和成交量变化
-// 从 CoinGlass 获取 STH-SOPR / LTH-SOPR / LTH Supply / 200WMA
+// 从 CoinGlass 获取 AHR999 / STH-SOPR / LTH-SOPR / LTH Supply / 200WMA
 
 export interface BTCMetrics {
+  ahr999: number | null;              // AHR999 BTC 定投估值指标
   weeklyRsi: number | null;           // 14 周期周线 RSI
   volume24h: number | null;           // 24小时成交量 (USD)
   volumeChangePercent: number | null; // 成交量 vs 30日均量 变化百分比
@@ -271,6 +272,7 @@ async function fetchLongShortRatio(apiKey: string): Promise<number | null> {
 }
 
 async function fetchOnChainMetrics(apiKey: string): Promise<{
+  ahr999: number | null;
   sthSopr: number | null;
   lthSopr: number | null;
   lthSupplyPercent: number | null;
@@ -285,8 +287,9 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   fundingRate: number | null;
   longShortRatio: number | null;
 }> {
-  const [sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowData, fundingRate, longShortRatio] =
+  const [ahr999Data, sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowData, fundingRate, longShortRatio] =
     await Promise.all([
+      fetchCoinGlassLatest(apiKey, "ahr999", "AHR999"),
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-sopr", "LTH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-long-term-holder-supply", "LTH Supply"),
@@ -300,6 +303,17 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     ]);
 
   const { etfFlowUsd, etfFlowDays } = etfFlowData;
+
+  // --- AHR999 ---
+  // /api/index/ahr999 返回时间序列，fetchCoinGlassLatest 已取数组最后一条
+  let ahr999: number | null = null;
+  if (ahr999Data) {
+    const value = Number(ahr999Data.ahr999_value);
+    if (!isNaN(value) && value > 0) {
+      ahr999 = Math.round(value * 10_000) / 10_000;
+      console.log(`[CoinGlass] AHR999 = ${ahr999}`);
+    }
+  }
 
   // --- STH-SOPR ---
   // 字段: sth_sopr
@@ -378,12 +392,13 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio };
+  return { ahr999, sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio };
 }
 
 /** 获取 BTC 技术指标 */
 export async function fetchBTCMetrics(): Promise<BTCMetrics> {
   const defaultMetrics: BTCMetrics = {
+    ahr999: null,
     weeklyRsi: null,
     volume24h: null,
     volumeChangePercent: null,
@@ -415,6 +430,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
       coinglassKey
         ? fetchOnChainMetrics(coinglassKey)
         : Promise.resolve({
+            ahr999: null,
             sthSopr: null,
             lthSopr: null,
             lthSupplyPercent: null,

@@ -32,6 +32,7 @@ export interface SentimentData {
 
 /** BTC 技术/链上指标 */
 export interface BTCMetrics {
+  ahr999: number | null;              // AHR999 BTC 定投估值指标
   weeklyRsi: number | null;           // 14 周期周线 RSI
   volume24h: number | null;           // 24小时成交量 (USD)
   volumeChangePercent: number | null; // 成交量 vs 30日均量 变化百分比
@@ -84,6 +85,7 @@ export interface NewsItem {
 export interface MetricsSnapshot {
   date: string;              // YYYY-MM-DD
   btcPrice: number | null;
+  ahr999: number | null;
   weeklyRsi: number | null;
   volume24h: number | null;
   volumeChangePct: number | null;

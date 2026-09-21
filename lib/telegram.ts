@@ -67,6 +67,13 @@ function fmtChange(change: number): string {
   return `${arrow} ${sign}${change.toFixed(2)}%`;
 }
 
+function getAhr999Zone(value: number): string {
+  if (value < 0.45) return "抄底区";
+  if (value < 1.2) return "定投区";
+  if (value < 5) return "谨慎区";
+  return "泡沫区";
+}
+
 /** 将市场数据 + AI 分析格式化为 Telegram 消息 */
 export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnalysis): string {
   const now = new Date();
@@ -128,7 +135,10 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
     lines.push(`  CNN恐惧贪婪: ${data.sentiment.cnnFearGreed}/100 (${data.sentiment.cnnFearGreedLabel})`);
   }
 
-  // BTC 技术指标
+  // BTC 核心估值 / 技术指标
+  if (data.btcMetrics?.ahr999 !== null) {
+    lines.push(`  <b>AHR999: ${data.btcMetrics.ahr999.toFixed(4)}</b> (${getAhr999Zone(data.btcMetrics.ahr999)})`);
+  }
   if (data.btcMetrics?.weeklyRsi !== null) {
     lines.push(`  BTC周线RSI: ${data.btcMetrics.weeklyRsi}`);
   }

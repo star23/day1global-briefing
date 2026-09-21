@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
       await upsertDailyMetrics({
         date: today,
         btcPrice: data.crypto?.BTC?.price ?? null,
+        ahr999: data.btcMetrics?.ahr999 ?? null,
         weeklyRsi: data.btcMetrics?.weeklyRsi ?? null,
         volume24h: data.btcMetrics?.volume24h ?? null,
         volumeChangePct: data.btcMetrics?.volumeChangePercent ?? null,

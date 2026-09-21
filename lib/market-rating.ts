@@ -18,6 +18,15 @@ function normalizeIndicator(name: string, value: number): number {
   switch (name) {
     // ===== 每日关注 =====
 
+    // AHR999: BTC 相对 200 日均价与币龄拟合价格的综合估值
+    // <0.45=历史抄底区, 0.45-1.2=定投区, 1.2-5=谨慎区, >=5=泡沫区
+    case "ahr999": {
+      if (value <= 0.45) return clamp((value / 0.45) * 15);
+      if (value <= 1.2) return clamp(15 + ((value - 0.45) / 0.75) * 25);
+      if (value <= 5) return clamp(40 + ((value - 1.2) / 3.8) * 60);
+      return 100;
+    }
+
     // ETF 每日净流入 (USD): 大量流入=贪婪, 大量流出=恐慌
     // 范围参考: -500M ~ +1B
     case "etfFlowUsd": {
@@ -119,10 +128,11 @@ function normalizeIndicator(name: string, value: number): number {
  *
  * 权重分组:
  * 每日关注 (总权重 32):
- *   - ETF 每日净流入: 12
- *   - Funding Rate: 8
- *   - 多空比: 5
- *   - 恐惧贪婪指数: 7
+ *   - AHR999: 10
+ *   - ETF 每日净流入: 9
+ *   - Funding Rate: 5
+ *   - 多空比: 3
+ *   - 恐惧贪婪指数: 5
  *
  * 每周关注 (总权重 68):
  *   - LTH-MVRV: 12
@@ -147,12 +157,13 @@ export function calculateMarketRating(
     group: "daily" | "weekly";
     category: string;
   }> = [
-    // 每日关注 — 机构资金流 / 衍生品
-    { name: "etfFlowUsd", label: "ETF 每日净流入", value: btcMetrics.etfFlowUsd, weight: 12, group: "daily", category: "机构资金流/衍生品" },
-    { name: "fundingRate", label: "Funding Rate", value: btcMetrics.fundingRate, weight: 8, group: "daily", category: "机构资金流/衍生品" },
-    { name: "longShortRatio", label: "多空比", value: btcMetrics.longShortRatio, weight: 5, group: "daily", category: "机构资金流/衍生品" },
+    // 每日关注 — BTC 估值 / 机构资金流 / 衍生品
+    { name: "ahr999", label: "AHR999", value: btcMetrics.ahr999, weight: 10, group: "daily", category: "BTC估值" },
+    { name: "etfFlowUsd", label: "ETF 每日净流入", value: btcMetrics.etfFlowUsd, weight: 9, group: "daily", category: "机构资金流/衍生品" },
+    { name: "fundingRate", label: "Funding Rate", value: btcMetrics.fundingRate, weight: 5, group: "daily", category: "机构资金流/衍生品" },
+    { name: "longShortRatio", label: "多空比", value: btcMetrics.longShortRatio, weight: 3, group: "daily", category: "机构资金流/衍生品" },
     // 每日关注 — 宏观情绪
-    { name: "fearGreed", label: "恐惧贪婪指数", value: fearGreed, weight: 7, group: "daily", category: "宏观情绪" },
+    { name: "fearGreed", label: "恐惧贪婪指数", value: fearGreed, weight: 5, group: "daily", category: "宏观情绪" },
 
     // 每周关注 — 链上基本面
     { name: "lthMvrv", label: "LTH-MVRV", value: btcMetrics.lthMvrv, weight: 12, group: "weekly", category: "链上基本面" },
