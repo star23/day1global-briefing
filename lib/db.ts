@@ -126,6 +126,22 @@ export async function getRecentMetrics(limit: number = 30) {
   return rows;
 }
 
+/** 查询最近一条有效的 AHR999，供轻量级公开接口使用 */
+export async function getLatestAhr999() {
+  const { rows } = await sql`
+    SELECT
+      date::text AS date,
+      ahr999,
+      btc_price,
+      created_at
+    FROM btc_metrics_daily
+    WHERE ahr999 IS NOT NULL
+    ORDER BY date DESC
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
 /**
  * 查询历史对比所需的三个时间点:
  * - 昨天 (yesterday)
