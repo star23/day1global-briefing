@@ -28,6 +28,12 @@ const BTC_APPROX_CIRCULATING = 19_850_000;
 /** CoinGlass API V4 基础 URL */
 const COINGLASS_BASE = "https://open-api-v4.coinglass.com";
 
+export interface LatestAhr999 {
+  date: string;
+  ahr999: number;
+  btcPrice: number | null;
+}
+
 /** 计算 RSI (Relative Strength Index) */
 function calculateRSI(closes: number[], period: number = 14): number | null {
   if (closes.length < period + 1) return null;
@@ -102,6 +108,36 @@ async function fetchCoinGlassLatest(
     console.error(`[CoinGlass] 获取 ${label} 出错:`, err);
     return null;
   }
+}
+
+async function fetchAhr999WithKey(
+  apiKey: string
+): Promise<LatestAhr999 | null> {
+  const data = await fetchCoinGlassLatest(apiKey, "ahr999", "AHR999");
+  if (!data) return null;
+
+  const ahr999 = Number(data.ahr999_value);
+  if (!Number.isFinite(ahr999) || ahr999 <= 0) return null;
+
+  const btcPrice = Number(data.current_value);
+  const rawDate = String(data.date_string || "");
+
+  return {
+    date: rawDate.replace(/\//g, "-"),
+    ahr999: Math.round(ahr999 * 10_000) / 10_000,
+    btcPrice:
+      Number.isFinite(btcPrice) && btcPrice > 0 ? btcPrice : null,
+  };
+}
+
+/** 仅获取最新 AHR999，供轻量级接口在数据库暂无数据时降级使用 */
+export async function fetchLatestAhr999(): Promise<LatestAhr999 | null> {
+  const apiKey = process.env.COINGLASS_API_KEY;
+  if (!apiKey) {
+    console.warn("[CoinGlass] 未设置 COINGLASS_API_KEY，无法获取 AHR999");
+    return null;
+  }
+  return fetchAhr999WithKey(apiKey);
 }
 
 /**
@@ -289,7 +325,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
 }> {
   const [ahr999Data, sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowData, fundingRate, longShortRatio] =
     await Promise.all([
-      fetchCoinGlassLatest(apiKey, "ahr999", "AHR999"),
+      fetchAhr999WithKey(apiKey),
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-sopr", "LTH-SOPR"),
       fetchCoinGlassLatest(apiKey, "bitcoin-long-term-holder-supply", "LTH Supply"),
@@ -308,11 +344,8 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   // /api/index/ahr999 返回时间序列，fetchCoinGlassLatest 已取数组最后一条
   let ahr999: number | null = null;
   if (ahr999Data) {
-    const value = Number(ahr999Data.ahr999_value);
-    if (!isNaN(value) && value > 0) {
-      ahr999 = Math.round(value * 10_000) / 10_000;
-      console.log(`[CoinGlass] AHR999 = ${ahr999}`);
-    }
+    ahr999 = ahr999Data.ahr999;
+    console.log(`[CoinGlass] AHR999 = ${ahr999}`);
   }
 
   // --- STH-SOPR ---
