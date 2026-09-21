@@ -3,13 +3,27 @@
 // 返回昨天、一周前、一个月前的 BTC 指标数据
 
 import { NextResponse } from "next/server";
-import { getComparisonMetrics } from "@/lib/db";
+import { ensureTable, getComparisonMetrics, migrateAddColumns } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 let cachedResult: Record<string, unknown> | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 10 * 60 * 1000;
+let schemaReady: Promise<void> | null = null;
+
+function ensureMetricsSchema() {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      await ensureTable();
+      await migrateAddColumns();
+    })().catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
+  }
+  return schemaReady;
+}
 
 export async function GET() {
   const now = Date.now();
@@ -20,6 +34,7 @@ export async function GET() {
   }
 
   try {
+    await ensureMetricsSchema();
     const rows = await getComparisonMetrics();
 
     // 转换为 { yesterday, oneWeek, oneMonth } 结构
