@@ -34,6 +34,7 @@ export async function GET() {
       const mapped = {
         date: row.date,
         btcPrice: row.btc_price ? Number(row.btc_price) : null,
+        ahr999: row.ahr999 != null ? Number(row.ahr999) : null,
         weeklyRsi: row.weekly_rsi ? Number(row.weekly_rsi) : null,
         volume24h: row.volume_24h ? Number(row.volume_24h) : null,
         volumeChangePct: row.volume_change_pct

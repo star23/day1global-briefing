@@ -41,6 +41,7 @@ export async function GET() {
         cnnFearGreedLabel: null,
       })),
       fetchBTCMetrics().catch(() => ({
+        ahr999: null,
         weeklyRsi: null,
         volume24h: null,
         volumeChangePercent: null,

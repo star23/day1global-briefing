@@ -1129,6 +1129,7 @@ function HistoryComparisonCard({
     inverted?: boolean; // true = 下降是利好
   }[] = [
     { name: "BTC 价格", currentVal: currentBtcPrice, snapshotKey: "btcPrice", format: (v) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` },
+    { name: "AHR999", currentVal: currentMetrics?.ahr999, snapshotKey: "ahr999", format: (v) => v.toFixed(4), inverted: true },
     { name: "恐慌贪婪", currentVal: currentFearGreed, snapshotKey: "fearGreed", format: (v) => String(Math.round(v)), inverted: true },
     { name: "LTH-MVRV", currentVal: currentMetrics?.lthMvrv, snapshotKey: "lthMvrv", format: (v) => v.toFixed(2) },
     { name: "NUPL", currentVal: currentMetrics?.nupl, snapshotKey: "nupl", format: (v) => v.toFixed(3) },
@@ -2432,6 +2433,25 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
   // --- 辅助：判断值是否有效 ---
   const has = (v: number | null | undefined): v is number => v !== null && v !== undefined;
 
+  // AHR999（BTC 定投估值指标）
+  const ahr999 = metrics?.ahr999;
+  const ahr999Val = has(ahr999) ? ahr999.toFixed(4) : "数据暂不可用";
+  const ahr999Signal = has(ahr999)
+    ? (ahr999 < 0.45 ? "历史抄底区——估值极低"
+      : ahr999 < 1.2 ? "定投区——适合分批积累"
+      : ahr999 < 5 ? "谨慎区——估值已不便宜"
+      : "泡沫区——警惕周期顶部")
+    : "等待 CoinGlass 数据";
+  const ahr999Badge = has(ahr999)
+    ? (ahr999 < 0.45 ? "🟢🟢 抄底"
+      : ahr999 < 1.2 ? "🟢 定投"
+      : ahr999 < 5 ? "🟡 谨慎"
+      : "🔴 泡沫")
+    : "⚪ 待接入";
+  const ahr999Color = has(ahr999)
+    ? (ahr999 < 1.2 ? COLORS.green : ahr999 < 5 ? COLORS.yellow : COLORS.red)
+    : COLORS.muted;
+
   // 周线 RSI
   const rsi = metrics?.weeklyRsi;
   const rsiVal = has(rsi) ? `${rsi}` : "计算中...";
@@ -2622,6 +2642,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   // 指标解释 tooltips
   const INDICATOR_TOOLTIPS: Record<string, string> = {
+    "AHR999": "BTC定投估值指标：AHR999=(收盘价/200日均价)×(收盘价/币龄拟合价格)。<0.45为历史抄底区，0.45–1.2为定投区，1.2–5需谨慎，≥5为泡沫区。数据取自CoinGlass AHR999接口的最新记录。",
     "ETF 净流入": "BTC现货ETF每日净流入/流出（美元），反映机构资金动向。大量流入=看涨情绪浓厚，大量流出=机构撤退。",
     "Funding Rate": "永续合约资金费率（Binance 8h）：>0多头付费给空头，<0空头付费给多头。极端正值=多头拥挤（警惕回调），负值=空头拥挤（反弹机会）。",
     "多空比": "全球期货交易所多空账户比：>1多头账户占优，<1空头账户占优。极端值通常预示反转。",
@@ -2639,10 +2660,11 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   // 每日关注指标
   const dailyIndicators = [
-    { name: "ETF 净流入", val: etfFlowVal, signal: etfFlowSignal, badge: etfFlowBadge, color: etfFlowColor, weight: 12 },
-    { name: "Funding Rate", val: fundingRateVal, signal: fundingRateSignal, badge: fundingRateBadge, color: fundingRateColor, weight: 8 },
-    { name: "多空比", val: longShortVal, signal: longShortSignal, badge: longShortBadge, color: longShortColor, weight: 5 },
-    { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted, weight: 7 },
+    { name: "AHR999", val: ahr999Val, signal: ahr999Signal, badge: ahr999Badge, color: ahr999Color, weight: 10 },
+    { name: "ETF 净流入", val: etfFlowVal, signal: etfFlowSignal, badge: etfFlowBadge, color: etfFlowColor, weight: 9 },
+    { name: "Funding Rate", val: fundingRateVal, signal: fundingRateSignal, badge: fundingRateBadge, color: fundingRateColor, weight: 5 },
+    { name: "多空比", val: longShortVal, signal: longShortSignal, badge: longShortBadge, color: longShortColor, weight: 3 },
+    { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted, weight: 5 },
   ];
 
   // 每周关注指标
@@ -2660,8 +2682,8 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   const btcIndicators = [...dailyIndicators, ...weeklyIndicators];
 
-  const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发") || i.badge.includes("强底") || i.badge.includes("历史底") || i.badge.includes("抄底") || i.badge.includes("底部") || i.badge.includes("恐慌")).length;
-  const topCount = btcIndicators.filter(i => i.badge.includes("谨慎") || i.badge.includes("见顶") || i.badge.includes("顶部") || i.badge.includes("过热")).length;
+  const triggeredCount = btcIndicators.filter(i => i.badge.includes("触发") || i.badge.includes("强底") || i.badge.includes("历史底") || i.badge.includes("抄底") || i.badge.includes("定投") || i.badge.includes("底部") || i.badge.includes("恐慌")).length;
+  const topCount = btcIndicators.filter(i => i.badge.includes("谨慎") || i.badge.includes("见顶") || i.badge.includes("顶部") || i.badge.includes("过热") || i.badge.includes("泡沫")).length;
 
   // --- 综合抄底/逃顶评级（加权评分系统）---
   const rating: MarketRating | null = metrics
@@ -2677,7 +2699,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   return (
     <>
-      <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>🔍 比特币抄底/逃顶分析<InfoTooltip text={`权重分配（满分100）：\n每日(32)：ETF净流入:12 | Funding Rate:8 | 多空比:5 | 恐惧贪婪:7\n每周(68)：LTH-MVRV:12 | NUPL:11 | LTH-SOPR:9 | STH-SOPR:8 | LTH持有者:7 | 365日均线:6 | 200周均线:6 | 周线RSI:5 | 成交量:4`} /></span>} icon="" accent={COLORS.orange}>
+      <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>🔍 比特币抄底/逃顶分析<InfoTooltip text={`权重分配（满分100）：\n每日(32)：AHR999:10 | ETF净流入:9 | Funding Rate:5 | 多空比:3 | 恐惧贪婪:5\n每周(68)：LTH-MVRV:12 | NUPL:11 | LTH-SOPR:9 | STH-SOPR:8 | LTH持有者:7 | 365日均线:6 | 200周均线:6 | 周线RSI:5 | 成交量:4`} /></span>} icon="" accent={COLORS.orange}>
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: COLORS.muted }}>BTC 当前价格</span>
           {btc ? (
@@ -2695,7 +2717,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         </div>
 
         {/* 每日关注 */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {rating.dailyScore.toFixed(1)}</span>}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, margin: "12px 0 4px 0" }}>每日关注（BTC估值 / 机构资金流 / 衍生品 / 情绪）{rating && <span style={{ fontWeight: 400, color: COLORS.muted }}> 得分 {rating.dailyScore.toFixed(1)}</span>}</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "22%" }} />
