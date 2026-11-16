@@ -2877,7 +2877,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
             <div style={{ textAlign: "center", padding: 12, color: COLORS.muted }}>数据暂不可用</div>
           )}
           <div style={{ marginTop: 10, fontSize: 11, color: COLORS.muted, borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8 }}>
-            120MA用于观察中长期趋势；MA200是常用的长期牛熊趋势基准；200WMA是经典周期估值锚；300周EMA用于观察BTC超长期潜在托底价格。均线基于历史价格，需结合斜率和持续站稳情况判断。
+            120MA用于指导技术仓：120MA以上持有技术仓，120MA以下卖出技术仓。MA200是常用的长期牛熊趋势基准；200WMA是经典周期估值锚；300周EMA用于观察BTC超长期潜在托底价格。
           </div>
         </div>
       </Card>
