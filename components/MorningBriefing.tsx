@@ -2523,6 +2523,9 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
   // 200 WMA
   const wma200 = metrics?.wma200Multiplier;
   const wma200Price = metrics?.wma200Price;
+  const ma120Price = metrics?.ma120Price;
+  const ma200Price = metrics?.ma200Price;
+  const ema300WeekPrice = metrics?.ema300WeekPrice;
   const wma200Val = has(wma200) ? `${wma200.toFixed(2)}x` : "数据暂不可用";
   const wma200Signal = has(wma200)
     ? (wma200 < 1.0 ? "低于200周均线——历史级底部！" : wma200 < 1.2 ? "接近200周均线支撑" : wma200 < 2.0 ? "正常上涨趋势" : wma200 < 3.5 ? "显著偏离均线——过热" : "极端偏离——周期顶部")
@@ -2800,55 +2803,81 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
         history={history}
       />
 
-      {/* 200 周均线专项卡片 */}
-      <Card title="200 周均线 (200WMA)" icon="📐" accent={COLORS.purple}>
+      {/* BTC 长期均线专项卡片 */}
+      <Card title="BTC 长期均线" icon="📐" accent={COLORS.purple}>
         <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.8 }}>
-          {has(wma200Price) && has(wma200) ? (
+          {has(wma200Price) || has(ma120Price) || has(ma200Price) || has(ema300WeekPrice) ? (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: COLORS.muted }}>200WMA 价格</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>${wma200Price.toLocaleString()}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 11, color: COLORS.muted }}>当前价格/200WMA</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: wma200Color }}>{wma200.toFixed(2)}x</div>
-                </div>
-              </div>
-              {/* 刻度条 */}
-              <div style={{ position: "relative", height: 32, background: COLORS.dimBg, borderRadius: 6, overflow: "hidden", marginBottom: 4 }}>
-                {/* 渐变背景：绿→灰→黄→红 */}
-                <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to right, ${COLORS.green}44, ${COLORS.muted}22 30%, ${COLORS.yellow}44 60%, ${COLORS.red}44)`, borderRadius: 6 }} />
-                {/* 关键刻度线 */}
-                {[
-                  { pos: 1.0 / 4.0, label: "1.0" },
-                  { pos: 2.0 / 4.0, label: "2.0" },
-                  { pos: 3.5 / 4.0, label: "3.5" },
-                ].map((m) => (
-                  <div key={m.label} style={{ position: "absolute", left: `${m.pos * 100}%`, top: 0, bottom: 0, width: 1, background: `${COLORS.muted}66` }}>
-                    <span style={{ position: "absolute", top: -14, left: -8, fontSize: 9, color: COLORS.muted }}>{m.label}</span>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
+                    {has(wma200Price) ? `$${wma200Price.toLocaleString()}` : "N/A"}
                   </div>
-                ))}
-                {/* 当前位置指针 */}
-                <div style={{
-                  position: "absolute",
-                  left: `${Math.min(Math.max(wma200 / 4.0, 0), 1) * 100}%`,
-                  top: 4, bottom: 4,
-                  width: 4, borderRadius: 2,
-                  background: wma200Color,
-                  transform: "translateX(-2px)",
-                  boxShadow: `0 0 6px ${wma200Color}`,
-                }} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>300 周 EMA 价格</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
+                    {has(ema300WeekPrice) ? `$${ema300WeekPrice.toLocaleString()}` : "N/A"}
+                  </div>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>120MA 价格</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
+                    {has(ma120Price) ? `$${ma120Price.toLocaleString()}` : "N/A"}
+                  </div>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>MA200 价格</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
+                    {has(ma200Price) ? `$${ma200Price.toLocaleString()}` : "N/A"}
+                  </div>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>当前价格/200WMA</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: wma200Color }}>
+                    {has(wma200) ? `${wma200.toFixed(2)}x` : "N/A"}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: wma200Color, fontWeight: 600, textAlign: "center" }}>
-                {wma200Signal}
-              </div>
+              {has(wma200) && (
+                <>
+                  {/* 刻度条 */}
+                  <div style={{ position: "relative", height: 32, background: COLORS.dimBg, borderRadius: 6, overflow: "hidden", marginBottom: 4 }}>
+                    {/* 渐变背景：绿→灰→黄→红 */}
+                    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to right, ${COLORS.green}44, ${COLORS.muted}22 30%, ${COLORS.yellow}44 60%, ${COLORS.red}44)`, borderRadius: 6 }} />
+                    {/* 关键刻度线 */}
+                    {[
+                      { pos: 1.0 / 4.0, label: "1.0" },
+                      { pos: 2.0 / 4.0, label: "2.0" },
+                      { pos: 3.5 / 4.0, label: "3.5" },
+                    ].map((m) => (
+                      <div key={m.label} style={{ position: "absolute", left: `${m.pos * 100}%`, top: 0, bottom: 0, width: 1, background: `${COLORS.muted}66` }}>
+                        <span style={{ position: "absolute", top: -14, left: -8, fontSize: 9, color: COLORS.muted }}>{m.label}</span>
+                      </div>
+                    ))}
+                    {/* 当前位置指针 */}
+                    <div style={{
+                      position: "absolute",
+                      left: `${Math.min(Math.max(wma200 / 4.0, 0), 1) * 100}%`,
+                      top: 4, bottom: 4,
+                      width: 4, borderRadius: 2,
+                      background: wma200Color,
+                      transform: "translateX(-2px)",
+                      boxShadow: `0 0 6px ${wma200Color}`,
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: wma200Color, fontWeight: 600, textAlign: "center" }}>
+                    {wma200Signal}
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div style={{ textAlign: "center", padding: 12, color: COLORS.muted }}>数据暂不可用</div>
           )}
           <div style={{ marginTop: 10, fontSize: 11, color: COLORS.muted, borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8 }}>
-            200周均线是BTC最可靠的长期估值锚，历史上每次触及都是周期大底
+            120MA用于观察中长期趋势；MA200是常用的长期牛熊趋势基准；200WMA是经典周期估值锚；300周EMA用于观察BTC超长期潜在托底价格。均线基于历史价格，需结合斜率和持续站稳情况判断。
           </div>
         </div>
       </Card>
