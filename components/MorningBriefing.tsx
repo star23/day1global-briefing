@@ -1287,15 +1287,17 @@ function LTHNetPositionChart() {
 
   // 图表尺寸
   const W = 820, H = 280;
-  const padL = 55, padR = 50, padT = 20, padB = 30;
+  const padL = 55, padR = 92, padT = 20, padB = 30;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
 
   // 数据范围
   const prices = chartData.map((d) => d.price);
+  const supplies = chartData.map((d) => d.supply);
   const dailyNets = chartData.map((d) => d.netChange1d!);
   const weeklyNets = chartData.map((d) => d.netChange7d!);
   const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  const sMin = Math.min(...supplies), sMax = Math.max(...supplies);
   // 柱状图和折线共享同一个 Y 轴范围
   const allNets = [...dailyNets, ...weeklyNets];
   const nMax = Math.max(...allNets.map(Math.abs), 1);
@@ -1311,6 +1313,13 @@ function LTHNetPositionChart() {
     const x = padL + i * gap + gap / 2;
     const y = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
     return `${x},${y}`;
+  }).join(" ");
+
+  // LTH Supply 折线坐标（独立刻度）
+  const supplyY = (val: number) => padT + chartH - ((val - sMin) / (sMax - sMin || 1)) * chartH;
+  const supplyLine = chartData.map((d, i) => {
+    const x = padL + i * gap + gap / 2;
+    return `${x},${supplyY(d.supply)}`;
   }).join(" ");
 
   // 7日净持仓折线坐标
@@ -1336,7 +1345,7 @@ function LTHNetPositionChart() {
   };
 
   return (
-    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>长期持有者净持仓变化<InfoTooltip text="柱状图 = 每日净持仓变化（今日 Supply - 昨日 Supply）\n蓝色折线 = 7日净持仓变化（今日 Supply - 7天前 Supply）\n灰色折线 = BTC 价格\n\n正值(绿色) = 长期持有者在增持\n负值(红色) = 长期持有者在减持" /></span>} icon="📊" accent={COLORS.accent}>
+    <Card title={<span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>长期持有者净持仓变化<InfoTooltip text="柱状图 = 每日净持仓变化（今日 Supply - 昨日 Supply）\n蓝色折线 = 7日净持仓变化（今日 Supply - 7天前 Supply）\n灰色折线 = BTC 价格\n金色折线 = LTH Supply\n\n正值(绿色) = 长期持有者在增持\n负值(红色) = 长期持有者在减持" /></span>} icon="📊" accent={COLORS.accent}>
       {/* Tooltip */}
       <div style={{ minHeight: 36, marginBottom: 4 }}>
         {hovered ? (
@@ -1352,9 +1361,9 @@ function LTHNetPositionChart() {
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.muted }}>{rangeLabel} · {chartData.length} 天 · 鼠标悬停查看详情</div>
-            <div style={{ display: "flex", gap: 12, fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 12px" }}>
+            <div style={{ fontSize: 11, color: COLORS.muted, flex: "1 1 180px" }}>{rangeLabel} · {chartData.length} 天 · 鼠标悬停查看详情</div>
+            <div style={{ display: "flex", gap: 10, fontSize: 10, color: COLORS.muted, flex: "1 1 280px", justifyContent: "flex-end", flexWrap: "wrap" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
                 <span style={{ width: 12, height: 2, background: COLORS.muted, display: "inline-block", borderRadius: 1 }} /> BTC价格
               </span>
@@ -1363,6 +1372,9 @@ function LTHNetPositionChart() {
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
                 <span style={{ width: 12, height: 2, background: COLORS.accent, display: "inline-block", borderRadius: 1 }} /> 7日
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 12, height: 2, background: COLORS.gold, display: "inline-block", borderRadius: 1 }} /> LTH Supply
               </span>
             </div>
           </div>
@@ -1427,17 +1439,28 @@ function LTHNetPositionChart() {
             opacity={0.5}
           />
 
+          {/* LTH Supply 折线 */}
+          <polyline
+            points={supplyLine}
+            fill="none"
+            stroke={COLORS.gold}
+            strokeWidth={1.7}
+            opacity={0.85}
+          />
+
           {/* 悬停竖线 + 圆点 */}
           {hoverIdx !== null && hoverIdx < chartData.length && (() => {
             const cx = padL + hoverIdx * gap + gap / 2;
             const d = chartData[hoverIdx];
             const priceY = padT + chartH - ((d.price - pMin) / (pMax - pMin || 1)) * chartH;
             const net7Y = netY(d.netChange7d!);
+            const lthSupplyY = supplyY(d.supply);
             return (
               <>
                 <line x1={cx} y1={padT} x2={cx} y2={padT + chartH} stroke={COLORS.accent} strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5} />
                 <circle cx={cx} cy={priceY} r={3} fill={COLORS.muted} stroke={COLORS.card} strokeWidth={1.5} />
                 <circle cx={cx} cy={net7Y} r={3} fill={COLORS.accent} stroke={COLORS.card} strokeWidth={1.5} />
+                <circle cx={cx} cy={lthSupplyY} r={3} fill={COLORS.gold} stroke={COLORS.card} strokeWidth={1.5} />
               </>
             );
           })()}
@@ -1450,6 +1473,10 @@ function LTHNetPositionChart() {
           <text x={W - padR + 4} y={padT + 4} textAnchor="start" fontSize={9} fill={COLORS.green}>+{(nMax / 1000).toFixed(0)}K</text>
           <text x={W - padR + 4} y={padT + chartH / 2 + 3} textAnchor="start" fontSize={9} fill={COLORS.muted}>0</text>
           <text x={W - padR + 4} y={padT + chartH} textAnchor="start" fontSize={9} fill={COLORS.red}>-{(nMax / 1000).toFixed(0)}K</text>
+
+          {/* Y轴标签 - 最右侧 LTH Supply */}
+          <text x={W - 4} y={padT + 4} textAnchor="end" fontSize={9} fill={COLORS.gold}>{(sMax / 1e6).toFixed(2)}M</text>
+          <text x={W - 4} y={padT + chartH} textAnchor="end" fontSize={9} fill={COLORS.gold}>{(sMin / 1e6).toFixed(2)}M</text>
 
           {/* X 轴日期标签 */}
           {chartData.map((d, i) => {
