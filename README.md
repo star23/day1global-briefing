@@ -174,6 +174,10 @@ Day1 Global Briefing 是一个开源的每日投资情报看板，实时聚合�
 - **语音早报**：OpenAI TTS 生成音频，存储在 Vercel Blob
 - **定时任务**：Vercel Cron 或 GitHub Actions 触发每日分析生成 + Telegram 推送
 
+**BTC DAT 周快照**：在 BTC 页的「BTC DAT 每周买盘 → 历史快照」查看，或读取 `GET /api/dat-weekly/history`（按周截止日期倒序）。观察周为 UTC 周二至次周一。只在观察周已结束、所有跟踪公司数据源均可用时，保存各家公司披露的买入量、合计和采集时间；没有买入记录使用 `null`，不是零。历史值不随后续披露修订而改变。
+
+独立工作流 `Archive BTC DAT weekly purchases` 每天 08:20 UTC 检查实时接口的 12 周窗口，补存遗漏的完整周；也可在 GitHub Actions 手动运行。首次执行会导入 `data/dat-weekly-initial.json`（2026-11-18 从正式站采集的 11 个已结束周，不是当时逐周采集），之后按截止日只插入、不覆盖，不设过期时间。GitHub Actions 和 Vercel 需配置指向同一数据库的 `POSTGRES_URL`；页面查询不写库，不调用 CoinGecko。
+
 ### 数据源
 
 | 数据 | 来源 | 费用 |

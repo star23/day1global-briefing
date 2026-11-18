@@ -1,0 +1,25 @@
+name: Archive BTC DAT weekly purchases
+
+on:
+  schedule:
+    - cron: '20 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    if: github.repository == 'star23/day1global-briefing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/archive-dat-weekly.ts
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
