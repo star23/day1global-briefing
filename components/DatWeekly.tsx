@@ -3,20 +3,23 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { datCompanies, type DatReport, type Purchase } from "@/lib/dat-weekly";
+import type { DatSnapshot } from "@/lib/dat-weekly-snapshot";
 
 type Palette = Record<"accent" | "green" | "purple" | "muted" | "text" | "cardBorder" | "dimBg", string>;
 const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 });
 const sum = (rows: Purchase[]) => rows.reduce((n, r) => n + r.btc, 0);
 const short = (date: string) => date.slice(5).replace("-", "/");
 
-async function fetchReport(url: string): Promise<DatReport> {
+async function fetchReport<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error("DAT weekly unavailable");
   return res.json();
 }
 
 export default function DatWeekly({ colors }: { colors: Palette }) {
-  const { data, error } = useSWR<DatReport>("/api/dat-weekly", fetchReport, { dedupingInterval: 60000, refreshInterval: 3600000 });
+  const { data, error } = useSWR<DatReport>("/api/dat-weekly", fetchReport<DatReport>, { dedupingInterval: 60000, refreshInterval: 3600000 });
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { data: archive, error: archiveError } = useSWR(historyOpen ? "/api/dat-weekly/history" : null, fetchReport<{ snapshots: DatSnapshot[]; source: "database" | "initial-capture" }>);
   const [end, setEnd] = useState<string | null>(null);
   const link = { color: colors.accent, textUnderlineOffset: 2 };
   const palette = [colors.accent, colors.green, colors.purple];
@@ -66,5 +69,22 @@ export default function DatWeekly({ colors }: { colors: Palette }) {
         <a style={link} href="https://analytics.metaplanet.jp/" target="_blank" rel="noopener noreferrer">Metaplanet（另查，不计入）</a>
       </div>
     </div>
+    <details onToggle={e => setHistoryOpen(e.currentTarget.open)} style={{ marginTop: 10 }}>
+      <summary style={{ cursor: "pointer", color: colors.text }}>历史快照</summary>
+      {archive?.source === "initial-capture" && <p role="status">仅显示 2026-11-18 的首批留档，数据库历史暂未载入。</p>}
+      {archive?.snapshots.length ? <div style={{ overflowX: "auto", maxHeight: 320 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+          <caption style={{ textAlign: "left", padding: "8px 0" }}>单位：BTC · 无记录不等于零买入</caption>
+          <thead><tr>{["观察周（UTC）", ...datCompanies.map(c => c.name), "合计", "采集日期（UTC）"].map(label =>
+            <th key={label} scope="col" style={{ padding: 5 }}>{label}</th>)}</tr></thead>
+          <tbody>{archive.snapshots.map(s => <tr key={s.end} style={{ borderTop: `1px solid ${colors.cardBorder}` }}>
+            <th scope="row" style={{ padding: 5 }}>{s.start} 至 {s.end}</th>
+            {datCompanies.map(c => <td key={c.id} style={{ padding: 5 }}>{s.companies[c.id] == null ? "无记录" : fmt.format(s.companies[c.id]!)}</td>)}
+            <td style={{ padding: 5, color: colors.text }}>{s.total === null ? "无记录" : fmt.format(s.total)}</td>
+            <td style={{ padding: 5 }}>{s.capturedAt.slice(0, 10)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div> : historyOpen && <p role="status">{archiveError ? "暂时无法读取历史快照。" : archive ? "暂无已归档的观察周。" : "正在读取历史快照…"}</p>}
+    </details>
   </div>;
 }

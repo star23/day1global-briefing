@@ -1,0 +1,13 @@
+[
+  {"start":"2026-09-01","end":"2026-09-07","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":null,"strive":1375,"the-blockchain-group":376},"total":1751},
+  {"start":"2026-09-08","end":"2026-09-14","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":null,"strive":469,"the-blockchain-group":4},"total":473},
+  {"start":"2026-09-15","end":"2026-09-21","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":950,"strive":1355,"the-blockchain-group":null},"total":2305},
+  {"start":"2026-09-22","end":"2026-09-28","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":1665,"strive":1107,"the-blockchain-group":13},"total":2785},
+  {"start":"2026-09-29","end":"2026-10-05","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":334,"strive":2001,"the-blockchain-group":null},"total":2335},
+  {"start":"2026-10-06","end":"2026-10-12","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":250,"strive":3311,"the-blockchain-group":null},"total":3561},
+  {"start":"2026-10-13","end":"2026-10-19","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":267,"strive":4045,"the-blockchain-group":null},"total":4312},
+  {"start":"2026-10-20","end":"2026-10-26","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":null,"strive":6182,"the-blockchain-group":null},"total":6182},
+  {"start":"2026-10-27","end":"2026-11-02","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":811,"strive":124,"the-blockchain-group":null},"total":935},
+  {"start":"2026-11-03","end":"2026-11-09","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":1036,"strive":29,"the-blockchain-group":null},"total":1065},
+  {"start":"2026-11-10","end":"2026-11-16","capturedAt":"2026-11-18T13:59:52Z","companies":{"strategy":485,"strive":251,"the-blockchain-group":12},"total":748}
+]
