@@ -94,26 +94,31 @@ function calculateEMA(closes: number[], period: number): number | null {
   return ema;
 }
 
-async function fetchBTCWeeklyCloses(): Promise<number[]> {
+async function fetchBTCCandles(bar: "1Wutc" | "1Dutc"): Promise<string[][]> {
   const candles = new Map<number, string[]>();
   let after: string | null = null;
 
-  for (let page = 0; page < 3; page++) {
+  const daily = bar === "1Dutc";
+  for (let page = 0; page < (daily ? 4 : 3); page++) {
     const endpoint = page === 0 ? "candles" : "history-candles";
     const limit = page === 0 ? 300 : 100;
     const params = new URLSearchParams({
       instId: "BTC-USDT",
-      bar: "1Wutc",
+      bar,
       limit: String(limit),
     });
     if (after) params.set("after", after);
 
     const response = await fetch(
       `https://www.okx.com/api/v5/market/${endpoint}?${params.toString()}`,
-      { cache: "no-store" }
-    );
-    if (!response.ok) {
-      throw new Error(`OKX weekly candles 请求失败: ${response.status}`);
+      { cache: "no-store", signal: AbortSignal.timeout(8000) }
+    ).catch((err) => {
+      if (!daily || candles.size === 0) throw err;
+      return null;
+    });
+    if (!response?.ok) {
+      if (daily && candles.size) break;
+      throw new Error(`OKX ${bar} candles 请求失败: ${response?.status}`);
     }
 
     const json = await response.json();
@@ -123,8 +128,9 @@ async function fetchBTCWeeklyCloses(): Promise<number[]> {
 
     for (const candle of json.data as string[][]) {
       const timestamp = Number(candle[0]);
-      if (Number.isFinite(timestamp)) candles.set(timestamp, candle);
+      if (Number.isFinite(timestamp) && !candles.has(timestamp)) candles.set(timestamp, candle);
     }
+    if (daily && candles.size >= 365) break;
 
     const oldestTimestamp = Math.min(
       ...json.data.map((candle: string[]) => Number(candle[0]))
@@ -137,8 +143,27 @@ async function fetchBTCWeeklyCloses(): Promise<number[]> {
 
   return Array.from(candles.entries())
     .sort(([a], [b]) => a - b)
-    .map(([, candle]) => Number(candle[4]))
-    .filter((close) => Number.isFinite(close) && close > 0);
+    .map(([, candle]) => candle);
+}
+
+function dailyAverages(candles: string[][]) {
+  const closes: number[] = [];
+  for (let i = candles.length - 1; i >= 0; i--) {
+    const close = Number(candles[i][4]);
+    if (!Number.isFinite(close) || close <= 0) break;
+    if (i + 1 < candles.length && Number(candles[i + 1][0]) - Number(candles[i][0]) !== 86_400_000) break;
+    closes.push(close);
+  }
+  closes.reverse();
+  const ma120 = calculateSMA(closes, 120);
+  const ma200 = calculateSMA(closes, 200);
+  const ma365 = calculateSMA(closes, 365);
+  return {
+    ma120Price: ma120 === null ? null : Math.round(ma120),
+    ma200Price: ma200 === null ? null : Math.round(ma200),
+    ma365Price: ma365 === null ? null : Math.round(ma365),
+    ma365Ratio: ma365 === null ? null : Number((closes[closes.length - 1] / ma365).toFixed(2)),
+  };
 }
 
 /**
@@ -212,59 +237,6 @@ export async function fetchLatestAhr999(): Promise<LatestAhr999 | null> {
   return fetchAhr999WithKey(apiKey);
 }
 
-/**
- * 从 CoinGlass 获取链上指标：STH-SOPR、LTH-SOPR、LTH Supply%、200WMA
- *
- * API 响应字段对照:
- *   bitcoin-sth-sopr          → { timestamp, price, sth_sopr }
- *   bitcoin-lth-sopr          → { timestamp, price, lth_sopr }
- *   bitcoin-long-term-holder-supply → { timestamp, price, long_term_holder_supply }
- *   200-week-moving-average-heatmap → { timestamp, price, moving_average_1440, moving_average_1440_ip }
- */
-/**
- * 从 CoinGlass 获取 BTC 365日均线
- * 取过去 365 天的日线 MA 数据，计算均值作为 ma365Price
- * 数组最后一条的 ma_value 为当天价格，ma365Ratio = 当天价格 / ma365Price
- */
-async function fetchBTC365MA(apiKey: string): Promise<{ ma365Price: number | null; ma365Ratio: number | null }> {
-  try {
-    const res = await fetch(
-      `${COINGLASS_BASE}/api/futures/indicators/ma?exchange=Binance&symbol=BTCUSDT&interval=1d&limit=365`,
-      {
-        cache: "no-store",
-        headers: { "CG-API-KEY": apiKey, accept: "application/json" },
-      }
-    );
-    if (!res.ok) {
-      console.error(`[CoinGlass] BTC 365MA 请求失败: ${res.status}`);
-      return { ma365Price: null, ma365Ratio: null };
-    }
-    const json = await res.json();
-    if (json.code !== "0" || !json.data || !Array.isArray(json.data) || json.data.length === 0) {
-      console.error(`[CoinGlass] BTC 365MA 数据异常:`, json.msg || "无数据");
-      return { ma365Price: null, ma365Ratio: null };
-    }
-    // 取所有 ma_value 计算平均值
-    const values = json.data
-      .map((d: Record<string, unknown>) => Number(d.ma_value))
-      .filter((v: number) => !isNaN(v) && v > 0);
-    if (values.length === 0) {
-      console.warn(`[CoinGlass] BTC 365MA 无有效 ma_value 数据`);
-      return { ma365Price: null, ma365Ratio: null };
-    }
-    const ma365Price = Math.round(values.reduce((a: number, b: number) => a + b, 0) / values.length);
-    // 最后一条是当天价格
-    const todayPrice = Number(json.data[json.data.length - 1].ma_value);
-    const ma365Ratio = !isNaN(todayPrice) && todayPrice > 0
-      ? Math.round((todayPrice / ma365Price) * 100) / 100
-      : null;
-    console.log(`[CoinGlass] BTC 365MA = $${ma365Price.toLocaleString()}, Today = $${Math.round(todayPrice).toLocaleString()}, Ratio = ${ma365Ratio} (${values.length} days)`);
-    return { ma365Price, ma365Ratio };
-  } catch (err) {
-    console.error(`[CoinGlass] 获取 BTC 365MA 出错:`, err);
-    return { ma365Price: null, ma365Ratio: null };
-  }
-}
 
 /**
  * 从 CoinGlass 获取 BTC ETF 每日净流入
@@ -388,14 +360,12 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   wma200Multiplier: number | null;
   nupl: number | null;
   lthMvrv: number | null;
-  ma365Price: number | null;
-  ma365Ratio: number | null;
   etfFlowUsd: number | null;
   etfFlowDays: number[];
   fundingRate: number | null;
   longShortRatio: number | null;
 }> {
-  const [ahr999Data, sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, ma365Data, etfFlowData, fundingRate, longShortRatio] =
+  const [ahr999Data, sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, etfFlowData, fundingRate, longShortRatio] =
     await Promise.all([
       fetchAhr999WithKey(apiKey),
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
@@ -404,7 +374,6 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
       fetchCoinGlassLatest(apiKey, "200-week-moving-average-heatmap", "200WMA"),
       fetchCoinGlassLatest(apiKey, "bitcoin-net-unrealized-profit-loss", "NUPL"),
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-realized-price", "LTH Realized Price"),
-      fetchBTC365MA(apiKey),
       fetchETFFlow(apiKey),
       fetchFundingRate(apiKey),
       fetchLongShortRatio(apiKey),
@@ -497,7 +466,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { ahr999, sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, ...ma365Data, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio };
+  return { ahr999, sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio };
 }
 
 /** 获取 BTC 技术指标 */
@@ -528,14 +497,15 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
   try {
     const coinglassKey = process.env.COINGLASS_API_KEY;
 
-    const [weeklyCloses, dailyRes, onChain] = await Promise.all([
-      fetchBTCWeeklyCloses().catch((err) => {
+    const [weeklyCandles, dailyCandles, onChain] = await Promise.all([
+      fetchBTCCandles("1Wutc").catch((err) => {
         console.error("获取 BTC 周线历史出错:", err);
-        return [] as number[];
+        return [];
       }),
-      fetch(
-        "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1Dutc&limit=200"
-      ),
+      fetchBTCCandles("1Dutc").catch((err) => {
+        console.error("获取 BTC 日线历史出错:", err);
+        return [];
+      }),
       coinglassKey
         ? fetchOnChainMetrics(coinglassKey)
         : Promise.resolve({
@@ -564,6 +534,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     }
 
     // --- 周线 RSI ---
+    const weeklyCloses = weeklyCandles.map(c => Number(c[4])).filter(close => Number.isFinite(close) && close > 0);
     const weeklyRsi = calculateRSI(weeklyCloses, 14);
     const ema300Week = calculateEMA(weeklyCloses, 300);
     const ema300WeekPrice = ema300Week === null ? null : Math.round(ema300Week);
@@ -577,40 +548,14 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     // --- 成交量分析 ---
     let volume24h: number | null = null;
     let volumeChangePercent: number | null = null;
-    let ma120Price: number | null = null;
-    let ma200Price: number | null = null;
-    if (dailyRes.ok) {
-      const dailyData = await dailyRes.json();
-      if (dailyData.code === "0" && dailyData.data?.length > 0) {
-        const dailyCandles = (dailyData.data as string[][]).slice().reverse();
-        const dailyCloses = dailyCandles
-          .map((candle) => Number(candle[4]))
-          .filter((close) => Number.isFinite(close) && close > 0);
-        const volumes = dailyCandles.map((candle) => parseFloat(candle[7]));
-
-        const ma120 = calculateSMA(dailyCloses, 120);
-        const ma200 = calculateSMA(dailyCloses, 200);
-        ma120Price = ma120 === null ? null : Math.round(ma120);
-        ma200Price = ma200 === null ? null : Math.round(ma200);
-
-        volume24h = volumes[volumes.length - 1];
-
-        if (volumes.length >= 30) {
-          const last30 = volumes.slice(-30);
-          const avg30d =
-            last30.reduce((a: number, b: number) => a + b, 0) / last30.length;
-          if (avg30d > 0 && volume24h !== null) {
-            volumeChangePercent =
-              Math.round(((volume24h - avg30d) / avg30d) * 100 * 10) / 10;
-          }
-        }
+    const volumes = dailyCandles.map(c => Number.parseFloat(c[7]));
+    if (volumes.length) {
+      volume24h = volumes[volumes.length - 1];
+      if (volumes.length >= 30) {
+        const last30 = volumes.slice(-30);
+        const avg30d = last30.reduce((a, b) => a + b, 0) / last30.length;
+        if (avg30d > 0) volumeChangePercent = Math.round(((volume24h - avg30d) / avg30d) * 1000) / 10;
       }
-    }
-
-    if (ma120Price !== null && ma200Price !== null) {
-      console.log(
-        `[OKX] 120MA = $${ma120Price.toLocaleString()}, MA200 = $${ma200Price.toLocaleString()}`
-      );
     }
 
     return {
@@ -618,8 +563,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
       weeklyRsi,
       volume24h,
       volumeChangePercent,
-      ma120Price,
-      ma200Price,
+      ...dailyAverages(dailyCandles),
       ema300WeekPrice,
     };
   } catch (err) {

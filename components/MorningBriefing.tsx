@@ -2838,9 +2838,9 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
       {/* BTC 长期均线专项卡片 */}
       <Card title="BTC 长期均线" icon="📐" accent={COLORS.purple}>
         <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.8 }}>
-          {has(wma200Price) || has(ma120Price) || has(ma200Price) || has(ema300WeekPrice) ? (
+          {has(wma200Price) || has(ma120Price) || has(ma200Price) || has(ma365Price) || has(ema300WeekPrice) ? (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 12 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: COLORS.muted }}>200WMA 价格</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
@@ -2860,9 +2860,15 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
                   </div>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: COLORS.muted }}>MA200 价格</div>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>200MA 价格</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
                     {has(ma200Price) ? `$${ma200Price.toLocaleString()}` : "N/A"}
+                  </div>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: COLORS.muted }}>365MA 价格</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>
+                    {has(ma365Price) ? `$${ma365Price.toLocaleString()}` : "N/A"}
                   </div>
                 </div>
                 <div style={{ minWidth: 0 }}>
@@ -2909,7 +2915,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
             <div style={{ textAlign: "center", padding: 12, color: COLORS.muted }}>数据暂不可用</div>
           )}
           <div style={{ marginTop: 10, fontSize: 11, color: COLORS.muted, borderTop: `1px solid ${COLORS.cardBorder}`, paddingTop: 8 }}>
-            120MA用于指导技术仓：120MA以上持有技术仓，120MA以下卖出技术仓。MA200是常用的长期牛熊趋势基准；200WMA是经典周期估值锚；300周EMA用于观察BTC超长期潜在托底价格。
+            120MA 用于指导技术仓：120MA 以上持有技术仓，120MA 以下卖出技术仓。200MA 和 365MA 分别是 200 日和 365 日简单均线，都是长期牛熊趋势的参考基准。200WMA 是周期估值锚；300 周 EMA 用于观察 BTC 的长期潜在支撑。
           </div>
         </div>
       </Card>
