@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, ReactNode } from "react";
 import useSWR from "swr";
 import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem, MetricsHistoryResponse, MetricsSnapshot, MarketRating } from "@/lib/types";
 import { calculateMarketRating } from "@/lib/market-rating";
+import DatWeekly from "./DatWeekly";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -2818,6 +2819,10 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
       {/* ETF 净流入图表 */}
       <ETFFlowChart />
+
+      <Card title="BTC DAT 每周买盘" accent={COLORS.purple}>
+        <DatWeekly colors={COLORS} />
+      </Card>
 
       {/* Bitcoin / Gold Ratio 图表 */}
       <BitcoinGoldRatioChart />
