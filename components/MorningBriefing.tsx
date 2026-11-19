@@ -76,6 +76,7 @@ function getMarketStateLabel(state: StockData["marketState"]): { text: string; c
     case "pre": return { text: "盘前", color: COLORS.yellow };
     case "regular": return { text: "交易中", color: COLORS.green };
     case "post": return { text: "盘后", color: COLORS.purple };
+    case "unknown": return { text: "状态未知", color: COLORS.muted };
     default: return { text: "休市", color: "#64748b" };
   }
 }
@@ -128,6 +129,7 @@ function writeTabHash(tabId: string) {
 // ---- 股票/加密元数据 ----
 const STOCK_META: Record<string, { name: string; note: string }> = {
   VOO: { name: "S&P 500 ETF", note: "标普500指数ETF，核心配置" },
+  VTI: { name: "Vanguard 全美股市 ETF", note: "覆盖美国大、中、小盘股票" },
   QQQ: { name: "Nasdaq 100 ETF", note: "纳指100 ETF，流动性最佳" },
   QQQM: { name: "Nasdaq 100 ETF", note: "纳指100 ETF Mini，费率更低适合长持" },
   NVDA: { name: "英伟达", note: "AI算力龙头，关注财报与Blackwell出货" },
@@ -140,16 +142,13 @@ const STOCK_META: Record<string, { name: string; note: string }> = {
   TEM: { name: "Tempus AI", note: "AI医疗诊断平台，精准医疗赛道" },
   GLD: { name: "SPDR黄金ETF", note: "全球最大黄金ETF，避险核心配置" },
   SMH: { name: "半导体ETF", note: "VanEck半导体ETF，AI芯片赛道核心配置" },
-  DRAM: { name: "内存半导体ETF", note: "Roundhill DRAM ETF，HBM/内存芯片主题" },
-  MRVL: { name: "Marvell Technology", note: "AI定制芯片与高速网络互联，数据中心基础设施" },
-  NBIS: { name: "Nebius Group", note: "AI云基础设施与GPU算力平台，高成长AI基础设施标的" },
-  INTC: { name: "英特尔", note: "CPU与晶圆代工转型，关注制程和Foundry进展" },
-  AMD: { name: "AMD", note: "CPU/GPU与AI加速卡，关注MI系列放量" },
   TSM: { name: "台积电", note: "全球晶圆代工龙头，AI芯片供应链核心" },
-  QCOM: { name: "高通", note: "移动芯片与边缘AI，关注手机、汽车和PC增长" },
-  RVI: { name: "Robinhood Ventures Fund I", note: "Robinhood私募基金，投资未上市独角兽" },
-  VCX: { name: "Fundrise Innovation Fund", note: "Fundrise科技创新基金，投资未上市科技公司" },
-  DXYZ: { name: "Destiny Tech100", note: "封闭式基金，投资SpaceX/OpenAI等未上市科技独角兽" },
+  "0700.HK": { name: "腾讯控股", note: "港股，关注微信、游戏与云业务" },
+  STRC: { name: "Strategy Stretch", note: "Strategy 浮动股息永续优先股" },
+  PL: { name: "Planet Labs", note: "地球观测卫星与遥感数据服务" },
+  XBI: { name: "SPDR 生物科技 ETF", note: "跟踪标普生物科技精选行业指数" },
+  NET: { name: "Cloudflare", note: "网络安全、内容分发与边缘计算" },
+  SHOP: { name: "Shopify", note: "电商软件、支付与商家服务" },
 };
 
 const CRYPTO_META: Record<string, { name: string; note: string }> = {
@@ -157,8 +156,6 @@ const CRYPTO_META: Record<string, { name: string; note: string }> = {
   ETH: { name: "以太坊", note: "智能合约平台，RWA生态持续增长" },
   XAUT: { name: "Tether黄金", note: "避险资产，锚定实物黄金" },
   HYPE: { name: "Hyperliquid", note: "去中心化衍生品协议" },
-  VIRTUAL: { name: "Virtuals Protocol", note: "AI Agent叙事，高Beta资产" },
-  TAO: { name: "Bittensor", note: "去中心化AI网络，AI+Crypto核心标的" },
   BNB: { name: "币安币", note: "币安生态核心，BNB Chain生态持续扩展" },
   SOL: { name: "Solana", note: "高性能公链，DeFi/NFT/Meme生态活跃" },
 };
@@ -936,7 +933,7 @@ function OverviewTab({ data, analysis }: { data?: MarketDataResponse; analysis?:
 
       {/* 美股标的动态 */}
       {analysis?.stockTopicsAnalysis && (
-        <Card title="美股标的动态" icon="📊" accent={COLORS.green}>
+        <Card title="股票与基金动态" icon="📊" accent={COLORS.green}>
           <div style={{ fontSize: 13, lineHeight: 1.9, color: COLORS.muted }}>
             <div style={{ whiteSpace: "pre-wrap" }}>{analysis.stockTopicsAnalysis}</div>
             <div style={{ marginTop: 10, fontSize: 11, color: "#64748b" }}>
@@ -3009,7 +3006,7 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
   return (
     <>
       {/* 美股持仓 */}
-      <Card title="📈 美股持仓追踪" icon="" accent={COLORS.accent}>
+      <Card title="📈 股票与基金持仓追踪" icon="" accent={COLORS.accent}>
         {data?.stocks && Object.keys(data.stocks).length > 0 ? (
           Object.entries(data.stocks).map(([ticker, stock]) => {
             const meta = STOCK_META[ticker] || { name: ticker, note: "" };
@@ -3030,7 +3027,7 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
                   <div style={{ fontSize: 10, color: COLORS.muted }}>{meta.name}</div>
                 </div>
                 <div style={{ minWidth: 70, textAlign: "right" }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>${formatPrice(stock.price)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>{stock.currency === "HKD" ? "HK$" : "$"}{formatPrice(stock.price)}</div>
                   <div style={{ fontSize: 11, color: getChangeColor(stock.changePercent), fontWeight: 600 }}>{formatChange(stock.changePercent)}</div>
                 </div>
                 <div style={{ fontSize: 11, color: COLORS.muted, flex: 1 }}>
@@ -3041,7 +3038,7 @@ function PortfolioTab({ data }: { data?: MarketDataResponse }) {
             );
           })
         ) : (
-          <p style={{ color: COLORS.muted }}>暂无美股数据</p>
+          <p style={{ color: COLORS.muted }}>暂无股票与基金数据</p>
         )}
       </Card>
 

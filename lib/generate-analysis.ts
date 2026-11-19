@@ -5,7 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MarketDataResponse, AIAnalysis, NewsItem } from "./types";
 import { RawNewsItem } from "./fetch-news";
-import { GeopoliticalNews, formatGeopoliticalNewsForPrompt } from "./fetch-geopolitical-news";
+import { CRYPTO_TOPICS, STOCK_TOPICS, GeopoliticalNews, formatGeopoliticalNewsForPrompt } from "./fetch-geopolitical-news";
 
 // 创建 Anthropic 客户端（使用环境变量 ANTHROPIC_API_KEY）
 const anthropic = new Anthropic();
@@ -14,7 +14,7 @@ const anthropic = new Anthropic();
 function formatMarketDataForPrompt(data: MarketDataResponse): string {
   // 美股部分
   const stockLines = Object.entries(data.stocks)
-    .map(([ticker, s]) => `  ${ticker}: $${s.price.toFixed(2)} (${s.changePercent >= 0 ? "+" : ""}${s.changePercent.toFixed(2)}%) [${s.marketState}]`)
+    .map(([ticker, s]) => `  ${ticker}: ${s.currency === "HKD" ? "HK$" : "$"}${s.price.toFixed(2)} (${s.changePercent >= 0 ? "+" : ""}${s.changePercent.toFixed(2)}%) [${s.marketState}]`)
     .join("\n");
 
   // 加密货币部分
@@ -26,7 +26,7 @@ function formatMarketDataForPrompt(data: MarketDataResponse): string {
   return `
 数据时间: ${data.timestamp}
 
-【美股持仓】
+【股票与基金持仓】
 ${stockLines || "  暂无数据"}
 
 【加密货币】
@@ -96,11 +96,11 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 （基于主题B的新闻和推文，分析伊朗是否会封锁霍尔木兹海峡。包括：伊朗的最新军事动态和官方声明、海峡通航的实际状况、对全球原油供应和油价的影响评估、各方的应对措施。2-3段，每段2-3句话。如果没有相关新闻，请说明目前暂无最新进展。）
 
 ===加密标的动态===
-（基于【加密标的相关新闻】，逐一分析每个持仓加密标的的最新动态。必须覆盖以下所有标的：BTC、ETH、XAUT、HYPE、VIRTUAL、TAO、BNB、SOL。
+（基于【加密标的相关新闻】，逐一分析每个持仓加密标的的最新动态。必须覆盖以下所有标的：${CRYPTO_TOPICS.map(t => t.key).join("、")}。
 每个标的用「▸ 标的名」开头，写1-2句话总结最新进展和值得关注的信号。如果某个标的没有搜到相关新闻，也要列出并写"暂无最新进展"。整体控制在 500 字以内。）
 
-===美股标的动态===
-（基于【美股标的相关新闻】，逐一分析每个持仓美股标的的最新动态。必须覆盖以下所有标的：NVDA、TSLA、GOOG、RKLB、CRCL、HOOD、COIN、TEM (Tempus AI)、GLD (SPDR黄金ETF)、MRVL、NBIS、INTC、AMD、TSM、QCOM。
+===股票与基金动态===
+（基于【股票与基金相关新闻】，逐一分析以下股票与基金的最新动态。必须覆盖以下所有标的：${STOCK_TOPICS.map(t => t.label).join("、")}。
 每个标的用「▸ 标的名」开头，写1-2句话总结最新进展和值得关注的信号。如果某个标的没有搜到相关新闻，也要列出并写"暂无最新进展"。
 特别关注：HOOD 分析中需包含其推出的 RVII (Robinhood Ventures Fund II) 基金的最新进展（募资规模、投资标的、开放状态等）。
 整体控制在 500 字以内。）
@@ -123,7 +123,7 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
 - 语气专业但通俗易懂（读者可能是非专业投资者）
 - 宏观判断、加密分析、操作建议每个部分控制在 200 字以内
 - 伊朗停火、霍尔木兹海峡每个部分控制在 300 字以内
-- 加密标的动态、美股标的动态每个部分控制在 500 字以内
+- 加密标的动态、股票与基金动态每个部分控制在 500 字以内
 - 今日必看的JSON必须是合法的JSON数组，可以直接被 JSON.parse 解析`;
 
   const message = await anthropic.messages.create({
@@ -145,7 +145,7 @@ ${marketSummary}${newsSummary}${geoNewsSummary}
   const iranCeasefire = extractSection(responseText, "伊朗停火");
   const hormuzStrait = extractSection(responseText, "霍尔木兹海峡");
   const cryptoTopicsAnalysis = extractSection(responseText, "加密标的动态");
-  const stockTopicsAnalysis = extractSection(responseText, "美股标的动态");
+  const stockTopicsAnalysis = extractSection(responseText, "股票与基金动态");
 
   // 解析新闻 JSON
   const topNews = extractNewsJSON(responseText);
