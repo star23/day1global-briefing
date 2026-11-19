@@ -109,7 +109,7 @@ export function formatBriefingForTTS(
     lines.push("");
   }
   if (analysis.stockTopicsAnalysis) {
-    lines.push("美股标的动态。");
+    lines.push("股票与基金动态。");
     lines.push(stripHtml(analysis.stockTopicsAnalysis));
     lines.push("");
   }

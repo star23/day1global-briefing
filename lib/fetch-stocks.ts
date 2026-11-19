@@ -5,7 +5,7 @@
 import { StockData, IndexData } from "./types";
 
 // 需要获取的美股标的列表
-const STOCK_SYMBOLS = ["VOO", "QQQ", "QQQM", "NVDA", "TSLA", "GOOG", "RKLB", "CRCL", "HOOD", "COIN", "TEM", "GLD", "SMH", "DRAM", "MRVL", "NBIS", "INTC", "AMD", "TSM", "QCOM", "RVI", "VCX", "DXYZ"];
+const STOCK_SYMBOLS = ["VOO", "VTI", "QQQ", "QQQM", "NVDA", "TSLA", "GOOG", "RKLB", "CRCL", "HOOD", "COIN", "TEM", "GLD", "SMH", "TSM", "STRC", "PL", "XBI", "NET", "SHOP"];
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
@@ -59,17 +59,13 @@ async function fetchMarketStatus(): Promise<StockData["marketState"]> {
 export async function fetchAllStocks(): Promise<{
   [ticker: string]: StockData;
 }> {
-  if (!FINNHUB_API_KEY) {
-    console.error("FINNHUB_API_KEY 未设置");
-    return {};
-  }
-
   const results: { [ticker: string]: StockData } = {};
 
   // 并发获取市场状态和所有股票报价
-  const [marketState, ...quotes] = await Promise.all([
-    fetchMarketStatus(),
-    ...STOCK_SYMBOLS.map((symbol) => fetchFinnhubQuote(symbol)),
+  const [marketState, quotes, tencent] = await Promise.all([
+    FINNHUB_API_KEY ? fetchMarketStatus() : "closed" as const,
+    FINNHUB_API_KEY ? Promise.all(STOCK_SYMBOLS.map(fetchFinnhubQuote)) : [],
+    fetchYahooSymbol("0700.HK"),
   ]);
 
   STOCK_SYMBOLS.forEach((symbol, i) => {
@@ -82,7 +78,7 @@ export async function fetchAllStocks(): Promise<{
       };
     }
   });
-
+  if (tencent) results["0700.HK"] = { ...tencent, currency: "HKD", marketState: "unknown" };
   return results;
 }
 
@@ -108,8 +104,10 @@ async function fetchYahooSymbol(
     const meta = data?.chart?.result?.[0]?.meta;
     if (!meta) return null;
 
-    const price = meta.regularMarketPrice ?? 0;
+    const price = meta.regularMarketPrice;
     const prevClose = meta.chartPreviousClose;
+    if (!Number.isFinite(price) || price <= 0) return null;
+    if (symbol === "0700.HK" && (meta.currency !== "HKD" || !Number.isFinite(prevClose) || prevClose <= 0)) return null;
     const changePercent = prevClose > 0
       ? ((price - prevClose) / prevClose) * 100
       : 0;

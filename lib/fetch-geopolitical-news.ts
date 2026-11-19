@@ -97,19 +97,17 @@ const GEO_TOPICS = [
 ] as const;
 
 /** 加密标的主题（每个标的 1 条新闻搜索） */
-const CRYPTO_TOPICS = [
+export const CRYPTO_TOPICS = [
   { key: "BTC", label: "Bitcoin (BTC)", query: "Bitcoin BTC ETF" },
   { key: "ETH", label: "Ethereum (ETH)", query: "Ethereum ETH upgrade DeFi" },
   { key: "XAUT", label: "Tether Gold (XAUT)", query: "Tether Gold XAUT" },
   { key: "HYPE", label: "Hyperliquid (HYPE)", query: "Hyperliquid HYPE" },
-  { key: "VIRTUAL", label: "Virtuals Protocol (VIRTUAL)", query: "Virtuals Protocol VIRTUAL AI agent" },
-  { key: "TAO", label: "Bittensor (TAO)", query: "Bittensor TAO subnet" },
   { key: "BNB", label: "BNB Chain", query: "BNB Binance Chain" },
   { key: "SOL", label: "Solana (SOL)", query: "Solana SOL ecosystem" },
 ] as const;
 
 /** 美股标的主题（每个标的 1 条新闻搜索） */
-const STOCK_TOPICS = [
+export const STOCK_TOPICS = [
   { key: "NVDA", label: "英伟达 (NVDA)", query: "Nvidia NVDA AI GPU" },
   { key: "TSLA", label: "特斯拉 (TSLA)", query: "Tesla TSLA" },
   { key: "GOOG", label: "Google (GOOG)", query: "Google Alphabet GOOG AI" },
@@ -119,12 +117,14 @@ const STOCK_TOPICS = [
   { key: "COIN", label: "Coinbase (COIN)", query: "Coinbase COIN crypto" },
   { key: "TEM", label: "Tempus AI (TEM)", query: "Tempus AI TEM stock" },
   { key: "GLD", label: "SPDR Gold (GLD)", query: "GLD SPDR gold ETF" },
-  { key: "MRVL", label: "Marvell Technology (MRVL)", query: "Marvell Technology MRVL AI chips" },
-  { key: "NBIS", label: "Nebius Group (NBIS)", query: "Nebius Group NBIS AI cloud" },
-  { key: "INTC", label: "Intel (INTC)", query: "Intel INTC foundry AI chip" },
-  { key: "AMD", label: "AMD", query: "AMD AI GPU MI300 MI350" },
   { key: "TSM", label: "TSMC (TSM)", query: "TSMC TSM AI semiconductor" },
-  { key: "QCOM", label: "Qualcomm (QCOM)", query: "Qualcomm QCOM edge AI chips" },
+  { key: "0700.HK", label: "腾讯控股 (0700.HK)", query: "Tencent Holdings Hong Kong stock" },
+  { key: "STRC", label: "Strategy Stretch (STRC)", query: "Strategy Stretch STRC preferred stock" },
+  { key: "PL", label: "Planet Labs (PL)", query: "Planet Labs PL satellite" },
+  { key: "XBI", label: "SPDR Biotech ETF (XBI)", query: "SPDR S&P Biotech ETF XBI" },
+  { key: "NET", label: "Cloudflare (NET)", query: "Cloudflare NET stock" },
+  { key: "SHOP", label: "Shopify (SHOP)", query: "Shopify SHOP stock" },
+  { key: "VTI", label: "Vanguard 全美股市 ETF (VTI)", query: "Vanguard Total Stock Market ETF VTI" },
 ] as const;
 
 // ========== 数据结构 ==========
@@ -257,7 +257,7 @@ export function formatGeopoliticalNewsForPrompt(geo: GeopoliticalNews): string {
     }
   }
   if (stockLines.length > 0) {
-    sections.push(`【美股标的相关新闻】\n${stockLines.join("\n\n")}`);
+    sections.push(`【股票与基金相关新闻】\n${stockLines.join("\n\n")}`);
   }
 
   return sections.length > 0 ? "\n\n" + sections.join("\n\n") : "";

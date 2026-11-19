@@ -169,7 +169,7 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   }
   if (analysis.stockTopicsAnalysis) {
     lines.push("");
-    lines.push(`📊 <b>美股标的动态</b>`);
+    lines.push(`📊 <b>股票与基金动态</b>`);
     lines.push(escapeHtml(analysis.stockTopicsAnalysis));
   }
   if (analysis.cryptoTopicsAnalysis) {
@@ -182,10 +182,10 @@ export function formatTelegramMessage(data: MarketDataResponse, analysis: AIAnal
   const stockTickers = Object.keys(data.stocks);
   if (stockTickers.length > 0) {
     lines.push("");
-    lines.push(`📈 <b>美股持仓</b>`);
+    lines.push(`📈 <b>股票与基金持仓</b>`);
     for (const [ticker, stock] of Object.entries(data.stocks)) {
       const arrow = stock.changePercent > 0 ? "🟢" : stock.changePercent < 0 ? "🔴" : "⚪";
-      lines.push(`  ${arrow} ${ticker}: $${fmtPrice(stock.price)} (${stock.changePercent >= 0 ? "+" : ""}${stock.changePercent.toFixed(2)}%)`);
+      lines.push(`  ${arrow} ${ticker}: ${stock.currency === "HKD" ? "HK$" : "$"}${fmtPrice(stock.price)} (${stock.changePercent >= 0 ? "+" : ""}${stock.changePercent.toFixed(2)}%)`);
     }
   }
 
@@ -233,9 +233,9 @@ function splitMessage(message: string): string[] {
     "💼 <b>操作建议</b>",
     "🌍 <b>伊朗停火进展</b>",
     "⛽ <b>霍尔木兹海峡</b>",
-    "📊 <b>美股标的动态</b>",
+    "📊 <b>股票与基金动态</b>",
     "🪙 <b>加密标的动态</b>",
-    "📈 <b>美股持仓</b>",
+    "📈 <b>股票与基金持仓</b>",
     "₿ <b>加密持仓</b>",
     "📰 <b>今日必看新闻</b>",
     "📊 完整数据请访问",

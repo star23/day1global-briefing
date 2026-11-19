@@ -1,6 +1,5 @@
 // ========== 获取加密货币数据 ==========
 // 使用 OKX 公共 API 获取加密货币实时价格和24小时涨跌幅
-// TAO 无现货，使用永续合约 TAO-USDT-SWAP 获取价格
 // 无需 API Key，限流 20次/2秒
 
 import { CryptoData } from "./types";
@@ -11,10 +10,8 @@ const CRYPTO_MAP: { [instId: string]: string } = {
   "ETH-USDT": "ETH",
   "XAUT-USDT": "XAUT",
   "HYPE-USDT": "HYPE",
-  "VIRTUAL-USDT": "VIRTUAL",
   "BNB-USDT": "BNB",
   "SOL-USDT": "SOL",
-  "TAO-USDT-SWAP": "TAO",
 };
 
 /** 从 OKX 获取单个交易对的行情 */
