@@ -61,6 +61,7 @@ export async function GET() {
         etfFlowDays: [] as number[],
         fundingRate: null,
         longShortRatio: null,
+        longShortHistory: [],
       })),
     ]);
 

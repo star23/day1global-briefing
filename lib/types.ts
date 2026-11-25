@@ -1,5 +1,6 @@
 // ========== 类型定义文件 ==========
 // 定义所有数据结构的 TypeScript 接口
+import type { AccountRatioDay } from "./binance-account-ratio";
 
 /** 单只股票的数据 */
 export interface StockData {
@@ -52,7 +53,8 @@ export interface BTCMetrics {
   etfFlowUsd: number | null;          // BTC ETF 每日净流入（美元）
   etfFlowDays: number[];              // ETF 最近 6 日净流入数组（从最新到最旧）
   fundingRate: number | null;         // BTC 资金费率（Binance 8h）
-  longShortRatio: number | null;      // 全球多空账户比
+  longShortRatio: number | null;      // 币安 BTCUSDT 净多账户数 / 净空账户数
+  longShortHistory: AccountRatioDay[];
 }
 
 /** /api/market-data 返回的完整数据格式 */

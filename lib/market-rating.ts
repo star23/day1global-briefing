@@ -3,6 +3,7 @@
 // 得分 0-100: 0=极度恐慌(抄底机会), 100=极度贪婪(逃顶信号)
 
 import { BTCMetrics, IndicatorScore, MarketRating } from "./types";
+import { accountRatioLabel } from "./binance-account-ratio";
 
 /**
  * 将原始指标值映射为 0-100 标准化分数
@@ -161,7 +162,7 @@ export function calculateMarketRating(
     { name: "ahr999", label: "AHR999", value: btcMetrics.ahr999, weight: 10, group: "daily", category: "BTC估值" },
     { name: "etfFlowUsd", label: "ETF 每日净流入", value: btcMetrics.etfFlowUsd, weight: 9, group: "daily", category: "机构资金流/衍生品" },
     { name: "fundingRate", label: "Funding Rate", value: btcMetrics.fundingRate, weight: 5, group: "daily", category: "机构资金流/衍生品" },
-    { name: "longShortRatio", label: "多空比", value: btcMetrics.longShortRatio, weight: 3, group: "daily", category: "机构资金流/衍生品" },
+    { name: "longShortRatio", label: accountRatioLabel, value: btcMetrics.longShortRatio, weight: 3, group: "daily", category: "机构资金流/衍生品" },
     // 每日关注 — 宏观情绪
     { name: "fearGreed", label: "恐惧贪婪指数", value: fearGreed, weight: 5, group: "daily", category: "宏观情绪" },
 

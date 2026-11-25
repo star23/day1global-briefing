@@ -7,6 +7,8 @@ import useSWR from "swr";
 import { MarketDataResponse, StockData, BTCMetrics, AIAnalysis, NewsItem, MetricsHistoryResponse, MetricsSnapshot, MarketRating } from "@/lib/types";
 import { calculateMarketRating } from "@/lib/market-rating";
 import DatWeekly from "./DatWeekly";
+import AccountRatioTrend from "./AccountRatioTrend";
+import { accountRatioLabel } from "@/lib/binance-account-ratio";
 
 // ---- SWR 数据获取函数 ----
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -2657,23 +2659,20 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
 
   // 多空比
   const longShort = metrics?.longShortRatio;
+  const ratioDays = metrics?.longShortHistory ?? [];
+  const lastDay = ratioDays.at(-1);
+  const previousRatio = ratioDays.at(-2)?.ratio;
   const longShortVal = has(longShort) ? longShort.toFixed(2) : "数据暂不可用";
-  const longShortSignal = has(longShort)
-    ? (longShort > 1.5 ? "多头大幅占优——警惕反转" : longShort > 1.2 ? "偏多" : longShort > 0.8 ? "多空均衡" : "空头占优——反弹可能")
-    : "等待CoinGlass数据";
-  const longShortBadge = has(longShort)
-    ? (longShort > 1.5 ? "🔴 过热" : longShort > 1.2 ? "🟡 偏热" : longShort > 0.8 ? "⚪ 中性" : "🟢 偏冷")
-    : "⚪ 待接入";
-  const longShortColor = has(longShort)
-    ? (longShort > 1.5 ? COLORS.red : longShort > 1.2 ? COLORS.yellow : longShort < 0.8 ? COLORS.green : COLORS.muted)
-    : COLORS.muted;
+  const longShortBadge = !has(longShort) ? "待数据" : longShort > 1 ? "账户偏多" : longShort < 1 ? "账户偏空" : "账户均衡";
+  const longPercent = lastDay?.longPercent ?? (has(longShort) ? 100 * longShort / (1 + longShort) : null);
+  const longShortSignal = has(longPercent) ? `净多账户占比 ${longPercent.toFixed(1)}%` : "等待 CoinGlass 数据";
 
   // 指标解释 tooltips
   const INDICATOR_TOOLTIPS: Record<string, string> = {
     "AHR999": "BTC定投估值指标：AHR999=(收盘价/200日均价)×(收盘价/币龄拟合价格)。<0.45为历史抄底区，0.45–1.2为定投区，1.2–5需谨慎，≥5为泡沫区。数据取自CoinGlass AHR999接口的最新记录。",
     "ETF 净流入": "BTC现货ETF每日净流入/流出（美元），反映机构资金动向。大量流入=看涨情绪浓厚，大量流出=机构撤退。",
     "Funding Rate": "永续合约资金费率（Binance 8h）：>0多头付费给空头，<0空头付费给多头。极端正值=多头拥挤（警惕回调），负值=空头拥挤（反弹机会）。",
-    "多空比": "全球期货交易所多空账户比：>1多头账户占优，<1空头账户占优。极端值通常预示反转。",
+    [accountRatioLabel]: "来源：CoinGlass，币安 BTCUSDT 合约。比值 = 净多账户数 / 净空账户数，不按仓位金额加权。昨日和近 7 天按最新样本的 UTC 日期对齐，不代表买卖资金流或价格反转。",
     "周线RSI": "相对强弱指数(RSI)：衡量BTC周线级别超买/超卖程度。<30为超跌区域（历史底部信号），>70为超买。",
     "成交量变化": "24小时成交量与30日平均成交量的偏离度。成交量极度萎缩（<-50%）通常意味着卖盘枯竭，是底部特征。",
     "STH-SOPR": "短期持有者已实现利润率(Short-Term Holder SOPR)：短期持有者（<155天）花费的币的盈亏比。<1表示短期持有者在亏损卖出。",
@@ -2691,7 +2690,7 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
     { name: "AHR999", val: ahr999Val, signal: ahr999Signal, badge: ahr999Badge, color: ahr999Color, weight: 10 },
     { name: "ETF 净流入", val: etfFlowVal, signal: etfFlowSignal, badge: etfFlowBadge, color: etfFlowColor, weight: 9 },
     { name: "Funding Rate", val: fundingRateVal, signal: fundingRateSignal, badge: fundingRateBadge, color: fundingRateColor, weight: 5 },
-    { name: "多空比", val: longShortVal, signal: longShortSignal, badge: longShortBadge, color: longShortColor, weight: 3 },
+    { name: accountRatioLabel, val: longShortVal, signal: longShortSignal, badge: longShortBadge, color: has(longShort) && longShort !== 1 ? COLORS.accent : COLORS.muted, weight: 3 },
     { name: "恐惧贪婪指数", val: `${fearGreed} / 100`, signal: fearGreed <= 10 ? "极度恐惧——历史极端水平！" : fearGreed <= 25 ? "极度恐惧" : "未到极端", badge: fearGreed <= 25 ? "✅ 触发" : "⚪ 未触发", color: fearGreed <= 25 ? COLORS.green : COLORS.muted, weight: 5 },
   ];
 
@@ -2769,9 +2768,20 @@ function BTCBottomTab({ data, analysis, history }: { data?: MarketDataResponse; 
                     {INDICATOR_TOOLTIPS[r.name] && <InfoTooltip text={INDICATOR_TOOLTIPS[r.name]} />}
                   </span>
                 </td>
-                <td style={{ padding: "6px 4px", color: COLORS.muted }}>{r.val}</td>
-                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 11 }}>{r.signal}</td>
-                <td style={{ padding: "6px 4px" }}><Badge color={r.color}>{r.badge}</Badge></td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted }}>
+                  {r.val}
+                  {r.name === accountRatioLabel && lastDay && <div style={{ fontSize: 10 }}>
+                    <time dateTime={lastDay.date}>{lastDay.date.slice(5)} UTC</time>
+                    <div>昨日比值 {previousRatio?.toFixed(2) ?? "暂无"}</div>
+                  </div>}
+                </td>
+                <td style={{ padding: "6px 4px", color: COLORS.muted, fontSize: 11 }}>
+                  {r.signal}
+                  {r.name === accountRatioLabel && <AccountRatioTrend days={ratioDays} color={COLORS.accent} />}
+                </td>
+                <td style={{ padding: "6px 4px" }}>{r.name === accountRatioLabel
+                  ? <span style={{ color: r.color, fontSize: 11, fontWeight: 600 }}>{r.badge}</span>
+                  : <Badge color={r.color}>{r.badge}</Badge>}</td>
               </tr>
             ))}
           </tbody>
