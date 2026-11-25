@@ -2,28 +2,9 @@
 // 从 OKX 获取 K 线数据计算周线 RSI 和成交量变化
 // 从 CoinGlass 获取 AHR999 / STH-SOPR / LTH-SOPR / LTH Supply / 200WMA
 
-export interface BTCMetrics {
-  ahr999: number | null;              // AHR999 BTC 定投估值指标
-  weeklyRsi: number | null;           // 14 周期周线 RSI
-  volume24h: number | null;           // 24小时成交量 (USD)
-  volumeChangePercent: number | null; // 成交量 vs 30日均量 变化百分比
-  sthSopr: number | null;             // 短期持有者已实现利润率
-  lthSopr: number | null;             // 长期持有者已实现利润率
-  lthSupplyPercent: number | null;    // 长期持有者供应占比（%）
-  wma200Price: number | null;         // 200 周均线价格
-  wma200Multiplier: number | null;    // 当前价格 / 200WMA 倍数
-  ma120Price: number | null;          // 120 日简单移动平均价格
-  ma200Price: number | null;          // 200 日简单移动平均价格
-  ema300WeekPrice: number | null;     // 300 周指数移动平均价格
-  nupl: number | null;                // NUPL 全网未实现净盈亏比率
-  lthMvrv: number | null;             // LTH-MVRV 长期持有者市场价值/已实现价值
-  ma365Price: number | null;          // BTC 365日均线价格
-  ma365Ratio: number | null;          // 当前价格 / 365日均线 倍数
-  etfFlowUsd: number | null;          // BTC ETF 每日净流入（美元）
-  etfFlowDays: number[];              // ETF 最近 6 日净流入数组（从最新到最旧）
-  fundingRate: number | null;         // BTC 资金费率（Binance 8h 收盘）
-  longShortRatio: number | null;      // 全球多空账户比
-}
+import { accountRatioWeek, type AccountRatioDay } from "./binance-account-ratio";
+import type { BTCMetrics } from "./types";
+export type { BTCMetrics } from "./types";
 
 // BTC 大致流通量（约 19.85M，每天增加约 450 BTC，误差 <0.1%）
 const BTC_APPROX_CIRCULATING = 19_850_000;
@@ -317,15 +298,10 @@ async function fetchFundingRate(apiKey: string): Promise<number | null> {
   }
 }
 
-/**
- * 从 CoinGlass 获取全球多空账户比
- * 端点: /api/futures/global-long-short-account-ratio/history
- * 取数组最后一条的 global_account_long_short_ratio
- */
-async function fetchLongShortRatio(apiKey: string): Promise<number | null> {
+async function fetchLongShortHistory(apiKey: string): Promise<AccountRatioDay[]> {
   try {
     const res = await fetch(
-      `${COINGLASS_BASE}/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=24h`,
+      `${COINGLASS_BASE}/api/futures/global-long-short-account-ratio/history?exchange=Binance&symbol=BTCUSDT&interval=1d&limit=8`,
       {
         cache: "no-store",
         headers: { "CG-API-KEY": apiKey, accept: "application/json" },
@@ -333,21 +309,17 @@ async function fetchLongShortRatio(apiKey: string): Promise<number | null> {
     );
     if (!res.ok) {
       console.error(`[CoinGlass] Long/Short Ratio 请求失败: ${res.status}`);
-      return null;
+      return [];
     }
     const json = await res.json();
     if (json.code !== "0" || !Array.isArray(json.data) || json.data.length === 0) {
       console.error(`[CoinGlass] Long/Short Ratio 数据异常:`, json.msg || "无数据");
-      return null;
+      return [];
     }
-    const latest = json.data[json.data.length - 1];
-    const ratio = Number(latest.global_account_long_short_ratio);
-    if (isNaN(ratio)) return null;
-    console.log(`[CoinGlass] Long/Short Ratio = ${ratio}`);
-    return ratio;
+    return accountRatioWeek(json.data);
   } catch (err) {
     console.error(`[CoinGlass] 获取 Long/Short Ratio 出错:`, err);
-    return null;
+    return [];
   }
 }
 
@@ -364,8 +336,9 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
   etfFlowDays: number[];
   fundingRate: number | null;
   longShortRatio: number | null;
+  longShortHistory: AccountRatioDay[];
 }> {
-  const [ahr999Data, sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, etfFlowData, fundingRate, longShortRatio] =
+  const [ahr999Data, sthSoprData, lthSoprData, lthSupplyData, wma200Data, nuplData, lthRealizedData, etfFlowData, fundingRate, longShortHistory] =
     await Promise.all([
       fetchAhr999WithKey(apiKey),
       fetchCoinGlassLatest(apiKey, "bitcoin-sth-sopr", "STH-SOPR"),
@@ -376,7 +349,7 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
       fetchCoinGlassLatest(apiKey, "bitcoin-lth-realized-price", "LTH Realized Price"),
       fetchETFFlow(apiKey),
       fetchFundingRate(apiKey),
-      fetchLongShortRatio(apiKey),
+      fetchLongShortHistory(apiKey),
     ]);
 
   const { etfFlowUsd, etfFlowDays } = etfFlowData;
@@ -466,7 +439,8 @@ async function fetchOnChainMetrics(apiKey: string): Promise<{
     }
   }
 
-  return { ahr999, sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio };
+  const longShortRatio = longShortHistory.at(-1)?.ratio ?? null;
+  return { ahr999, sthSopr, lthSopr, lthSupplyPercent, wma200Price, wma200Multiplier, nupl, lthMvrv, etfFlowUsd, etfFlowDays, fundingRate, longShortRatio, longShortHistory };
 }
 
 /** 获取 BTC 技术指标 */
@@ -492,6 +466,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
     etfFlowDays: [],
     fundingRate: null,
     longShortRatio: null,
+    longShortHistory: [],
   };
 
   try {
@@ -526,6 +501,7 @@ export async function fetchBTCMetrics(): Promise<BTCMetrics> {
             etfFlowDays: [] as number[],
             fundingRate: null,
             longShortRatio: null,
+            longShortHistory: [],
           }),
     ]);
 
